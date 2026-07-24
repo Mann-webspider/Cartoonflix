@@ -1,0 +1,72 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# OIDC — assume an AWS role, no long-lived keys.
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPO: cartoonflix-transcode-worker
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # --- transcode worker image ---
+      - name: Build & push worker image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          IMAGE="$REGISTRY/$ECR_REPO:$GITHUB_SHA"
+          docker build -t "$IMAGE" -t "$REGISTRY/$ECR_REPO:latest" ffmpeg-service
+          docker push "$IMAGE"
+          docker push "$REGISTRY/$ECR_REPO:latest"
+
+      # --- lambda packages ---
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.22" }
+
+      - name: Package admin API (Node)
+        run: cd admin-backend && npm ci --omit=dev && npm run package
+      - name: Package user API (Go)
+        run: cd user-backend && make package
+      - name: Package orchestrator + completion
+        run: cd ffmpeg-service && npm ci --omit=dev && npm run package:lambdas
+
+      # --- terraform apply ---
+      - uses: hashicorp/setup-terraform@v3
+      - name: Terraform apply
+        working-directory: infra
+        env:
+          TF_VAR_mongo_uri: ${{ secrets.MONGO_URI }}
+          TF_VAR_cloudfront_public_key_pem: ${{ secrets.CF_PUBLIC_KEY_PEM }}
+          TF_VAR_cloudfront_private_key_pem: ${{ secrets.CF_PRIVATE_KEY_PEM }}
+          TF_VAR_worker_image_tag: ${{ github.sha }}
+        run: |
+          terraform init
+          terraform apply -auto-approve
