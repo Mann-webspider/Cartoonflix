@@ -1,0 +1,72 @@
+{
+  "data": [
+    {
+      "id": "67793449a4fb1d0e3f8dc241",
+      "title": "Doraemon: Nobita's Dorabian Nights",
+      "description": "Nobita and his friends go to rescue Shizuka into the world of the 'Arabian Nights (Thousand and One Nights)'.",
+      "genres": [
+        "Adventure",
+        "Animation",
+        "Comedy",
+        "Family",
+        "Fantasy",
+        "Sci-Fi"
+      ],
+      "type": "movie",
+      "video_id": 64288,
+      "duration": "1h32m",
+      "video_url": "https://d1nb9xnp3todvf.cloudfront.net/movie/movie_64288/master.m3u8",
+
+      "poster_url": "https://d1nb9xnp3todvf.cloudfront.net/movie/movie_63552/poster_1080.webp",
+      "thumbnail_url": "https://d1nb9xnp3todvf.cloudfront.net/movie/movie_64288/thumbnail_720.webp"
+    },
+    {
+      "_id": {
+        "$oid": "678f575c6ed0f1a5052a5c99"
+      },
+      "__v": 0,
+      "deleted": false,
+      "description": "Nobita requests of Doraemon the Moshimo-box and wishes for the world to become a place where the use of magic is possible. Witchcraft replaces science and technology and everyone makes use of it on their daily lives.",
+      "genres": [
+        "Adventure",
+        "Animation",
+        "Family",
+        "Fantasy",
+        "Sci-Fi"
+      ],
+      "isPublish": true,
+      "isReady": true,
+      "seasons": [],
+      "status": "ready",
+      "title": "Doraemon the Movie Jadoo Mantar Aur Jahnoom",
+      "type": "movie",
+      "video_id": 64144,
+      "poster_url": "https://d1nb9xnp3todvf.cloudfront.net/movie/movie_64144/poster_1080.webp",
+      "thumbnail_url": "https://d1nb9xnp3todvf.cloudfront.net/movie/movie_64144/thumbnail_720.webp",
+      "video_url": "https://d1nb9xnp3todvf.cloudfront.net/movie/movie_64144/master.m3u8",
+      "releaseDate": "2014-08-02"
+    },
+    {
+      "id": "555555555555555555555555",
+      "title": "Inception",
+      "description": "A thief who steals corporate secrets through use of dream-sharing technology is given a task that calls for him to plant an idea into the mind of a CEO.",
+      "genres": ["Action", "Sci-Fi", "Thriller"],
+      "type": "movie",
+      "video_id": 10002,
+      "duration": "2h28m",
+      "video_url": "https://d1nb9xnp3todvf.cloudfront.net/movie/movie_10002/master.m3u8",
+      "thumbnail_url": "https://c4.wallpaperflare.com/wallpaper/574/531/642/2010-inception-movie-inception-poster-wallpaper-preview.jpg"
+    },
+    {
+      "id": "444444444444444444444444",
+      "title": "The Shawshank Redemption",
+      "description": "Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.",
+      "genres": ["Drama", "Crime"],
+      "type": "movie",
+      "video_id": 10003,
+      "duration": "2h22m",
+      "video_url": "https://d1nb9xnp3todvf.cloudfront.net/movie/movie_10003/master.m3u8",
+      "thumbnail_url": "https://w0.peakpx.com/wallpaper/979/854/HD-wallpaper-shawshank-redemption-redemption-shawshank-the-shawshank-redemption-thumbnail.jpg"
+    }
+  ]
+}
