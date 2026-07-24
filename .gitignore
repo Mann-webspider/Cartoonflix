@@ -1,0 +1,40 @@
+# dependencies
+**/node_modules
+
+# secrets — never commit keys or env files
+*.env
+.env*
+!.env.example
+*.pem
+*.key
+private_key*
+public_key*
+
+# build / runtime output
+**/.next
+**/dist
+**/build
+**/temp
+**/tmp
+ffmpeg-service/temp
+**/output
+
+# terraform
+**/.terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+
+# large / sample media — keep out of the repo (test inputs, copyrighted samples)
+ffmpeg-service/src/ffmpeg/input/
+user-frontend/public/songs/
+*.mp4
+*.mov
+*.mkv
+*.mp3
+
+# misc
+start.sh
+.DS_Store
