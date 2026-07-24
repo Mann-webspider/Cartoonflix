@@ -1,0 +1,154 @@
+data "aws_caller_identity" "current" {}
+
+# ---------------------------------------------------------------------------
+# Networking — use the account's default VPC to keep the demo simple.
+# Swap for a dedicated VPC module in production.
+# ---------------------------------------------------------------------------
+data "aws_vpc" "default" {
+  default = true
+}
+
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
+
+resource "aws_security_group" "fargate" {
+  name        = "${var.project}-fargate"
+  description = "Egress for ephemeral transcode tasks"
+  vpc_id      = data.aws_vpc.default.id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Secrets — values are set here from sensitive vars; state lives in the
+# encrypted remote backend. Lambdas fetch by ARN at runtime.
+# ---------------------------------------------------------------------------
+resource "aws_secretsmanager_secret" "mongo" {
+  name = "${var.project}/mongo-uri"
+}
+
+resource "aws_secretsmanager_secret_version" "mongo" {
+  secret_id     = aws_secretsmanager_secret.mongo.id
+  secret_string = var.mongo_uri
+}
+
+resource "aws_secretsmanager_secret" "cf_key" {
+  name = "${var.project}/cloudfront-private-key"
+}
+
+resource "aws_secretsmanager_secret_version" "cf_key" {
+  secret_id     = aws_secretsmanager_secret.cf_key.id
+  secret_string = var.cloudfront_private_key_pem
+}
+
+# ---------------------------------------------------------------------------
+# Modules
+# ---------------------------------------------------------------------------
+module "s3" {
+  source             = "./modules/s3"
+  project            = var.project
+  raw_retention_days = var.raw_retention_days
+}
+
+module "sqs" {
+  source  = "./modules/sqs"
+  project = var.project
+}
+
+module "ecr" {
+  source  = "./modules/ecr"
+  project = var.project
+}
+
+module "cloudfront" {
+  source                 = "./modules/cloudfront"
+  project                = var.project
+  hls_bucket_id          = module.s3.hls_bucket_id
+  hls_bucket_arn         = module.s3.hls_bucket_arn
+  hls_bucket_domain_name = module.s3.hls_bucket_regional_domain_name
+  public_key_pem         = var.cloudfront_public_key_pem
+}
+
+module "ecs" {
+  source            = "./modules/ecs"
+  project           = var.project
+  aws_region        = var.aws_region
+  worker_image      = "${module.ecr.repository_url}:${var.worker_image_tag}"
+  raw_bucket_arn    = module.s3.raw_bucket_arn
+  hls_bucket_arn    = module.s3.hls_bucket_arn
+  raw_bucket_name   = module.s3.raw_bucket_id
+  hls_bucket_name   = module.s3.hls_bucket_id
+  cloudfront_domain = module.cloudfront.distribution_domain
+}
+
+module "lambda" {
+  source     = "./modules/lambda"
+  project    = var.project
+  aws_region = var.aws_region
+
+  # queue / events
+  queue_arn = module.sqs.queue_arn
+  queue_url = module.sqs.queue_url
+
+  # ecs run-task target
+  cluster_arn     = module.ecs.cluster_arn
+  task_def_arn    = module.ecs.task_definition_arn
+  task_exec_role  = module.ecs.execution_role_arn
+  task_role_arn   = module.ecs.task_role_arn
+  container_name  = module.ecs.container_name
+  subnet_ids      = data.aws_subnets.default.ids
+  security_group  = aws_security_group.fargate.id
+  raw_bucket_name = module.s3.raw_bucket_id
+
+  # packages
+  admin_api_zip    = var.admin_api_lambda_zip
+  user_api_zip     = var.user_api_lambda_zip
+  orchestrator_zip = var.orchestrator_lambda_zip
+  completion_zip   = var.completion_lambda_zip
+
+  # runtime config
+  mongo_secret_arn  = aws_secretsmanager_secret.mongo.arn
+  cf_key_secret_arn = aws_secretsmanager_secret.cf_key.arn
+  cloudfront_domain = module.cloudfront.distribution_domain
+  cf_key_group_id   = module.cloudfront.key_group_id
+  cf_public_key_id  = module.cloudfront.public_key_id
+}
+
+module "apigw" {
+  source            = "./modules/apigw"
+  project           = var.project
+  admin_lambda_arn  = module.lambda.admin_api_invoke_arn
+  admin_lambda_name = module.lambda.admin_api_function_name
+  user_lambda_arn   = module.lambda.user_api_invoke_arn
+  user_lambda_name  = module.lambda.user_api_function_name
+}
+
+# ---------------------------------------------------------------------------
+# S3 (raw) -> EventBridge -> SQS  (buffer + retry + DLQ before RunTask)
+# ---------------------------------------------------------------------------
+resource "aws_cloudwatch_event_rule" "raw_uploaded" {
+  name        = "${var.project}-raw-uploaded"
+  description = "Fires when a raw video lands in the raw bucket"
+
+  event_pattern = jsonencode({
+    source      = ["aws.s3"]
+    detail-type = ["Object Created"]
+    detail = {
+      bucket = { name = [module.s3.raw_bucket_id] }
+    }
+  })
+}
+
+resource "aws_cloudwatch_event_target" "raw_to_sqs" {
+  rule = aws_cloudwatch_event_rule.raw_uploaded.name
+  arn  = module.sqs.queue_arn
+}

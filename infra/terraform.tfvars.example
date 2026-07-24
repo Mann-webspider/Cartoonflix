@@ -1,0 +1,21 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+aws_region = "ap-south-1"
+project    = "cartoonflix"
+
+# MongoDB Atlas serverless connection string
+mongo_uri = "mongodb+srv://<user>:<pass>@<cluster>/cartoonflix"
+
+# CloudFront key pair (generate a FRESH pair — the old one was leaked and is compromised):
+#   openssl genrsa -out cf_private.pem 2048
+#   openssl rsa -pubout -in cf_private.pem -out cf_public.pem
+cloudfront_public_key_pem  = <<-EOT
+-----BEGIN PUBLIC KEY-----
+...
+-----END PUBLIC KEY-----
+EOT
+
+cloudfront_private_key_pem = <<-EOT
+-----BEGIN PRIVATE KEY-----
+...
+-----END PRIVATE KEY-----
+EOT
