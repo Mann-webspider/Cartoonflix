@@ -108,6 +108,10 @@ cd admin-backend && npm install && npm run dev
 cd user-backend && go run ./cmd
 # viewer / admin apps
 cd user-frontend && npm install && npm run dev
+
+# transcode a video locally (same pipeline as the cloud), then mark it ready
+cd ffmpeg-service && npm install
+make transcode KEY=<contentId>/source.mp4 CONTENT=<contentId>
 ```
 
 ## Deploy
@@ -123,6 +127,6 @@ terraform init && terraform plan && terraform apply
 ## Roadmap
 
 - [x] Phase 1 — security hardening, monorepo cleanup, key rotation
-- [ ] Phase 2 — Terraform infra + CI/CD *(in progress)*
-- [ ] Phase 3 — serverless API + on-demand transcode pipeline
+- [x] Phase 2 — Terraform infra + CI/CD
+- [x] Phase 3 — serverless API (admin + user Lambdas) + on-demand/local transcode pipeline
 - [ ] Phase 4 — schema redesign, auth, viewer UI, search & recommendations, observability
