@@ -1,28 +1,25 @@
 {
   "name": "ffmpeg-service",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "2.0.0",
+  "description": "One-shot HLS transcode worker + transcode orchestration lambdas",
+  "type": "module",
+  "main": "src/worker.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon src/app.js"
+    "start": "node src/worker.js",
+    "transcode": "node src/cli.js",
+    "package:lambdas": "node scripts/package-lambdas.mjs",
+    "test": "node --test"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-ecs": "^3.717.0",
     "@aws-sdk/client-s3": "^3.717.0",
-    "@smithy/node-http-handler": "^3.3.3",
-    "amqplib": "^0.10.5",
-    "aws-sdk": "^2.1692.0",
-    "axios": "^1.7.9",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
+    "@aws-sdk/client-secrets-manager": "^3.717.0",
     "ffmpeg-static": "^5.2.0",
     "fluent-ffmpeg": "^2.1.3",
-    "multer": "^1.4.5-lts.1",
-    "nodemon": "^3.1.7",
-    "p-limit": "^6.2.0",
-    "sharp": "^0.33.5"
+    "mongodb": "^6.12.0",
+    "p-limit": "^6.2.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
   }
 }
