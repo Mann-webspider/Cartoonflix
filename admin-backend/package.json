@@ -1,24 +1,24 @@
 {
   "name": "admin-backend",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "2.0.0",
+  "description": "CartoonFlix content-management API (Express, runs locally or as a Lambda)",
+  "main": "src/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "package": "mkdir -p dist && rm -f dist/lambda.zip && zip -qr dist/lambda.zip lambda.js src node_modules",
+    "test": "node --test"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "amqplib": "^0.10.5",
-    "aws-sdk": "^2.1692.0",
+    "@aws-sdk/client-s3": "^3.717.0",
+    "@aws-sdk/client-secrets-manager": "^3.717.0",
+    "@aws-sdk/s3-request-presigner": "^3.717.0",
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "mongoose": "^8.8.4",
-    "morgan": "^1.10.0"
+    "serverless-http": "^3.2.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.7"

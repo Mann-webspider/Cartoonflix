@@ -1,36 +1,31 @@
-const AWS = require('aws-sdk');
-const mongoose = require('mongoose');
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
-// Load environment variables
-require('dotenv').config();
+const s3 = new S3Client({ region: process.env.AWS_REGION });
 
-// Configure AWS SDK
-AWS.config.update({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION,
-});
-
-// Create S3 instance
-const s3 = new AWS.S3();
-
+// Presign a PUT for the raw bucket. Key convention `<contentId>/<fileName>` lets
+// the transcode orchestrator derive the contentId from the S3 event.
 const generatePresignedUrl = async (req, res) => {
-  const { fileName, fileType ,prefix} = req.body;
-  
- 
-  const params = {
-    Bucket: process.env.AWS_S3_BUCKET_ORIGINAL,
-    Key: `${prefix}/${fileName}`,
-    Expires: 5*60, // URL valid for 3 min
-    ContentType: fileType,
-  };
+  const { fileName, fileType, contentId } = req.body;
+  if (!fileName || !contentId) {
+    return res.status(400).json({ error: "fileName and contentId are required" });
+  }
 
+  const key = `${contentId}/${fileName}`;
   try {
-    const uploadUrl = await s3.getSignedUrlPromise('putObject', params);
-    res.json({ uploadUrl ,prefix});
+    const uploadUrl = await getSignedUrl(
+      s3,
+      new PutObjectCommand({
+        Bucket: process.env.RAW_BUCKET,
+        Key: key,
+        ContentType: fileType,
+      }),
+      { expiresIn: 300 }
+    );
+    res.json({ uploadUrl, key });
   } catch (error) {
-    console.error('Error generating pre-signed URL:', error);
-    res.status(500).json({ error: 'Failed to generate pre-signed URL' });
+    console.error("Error generating presigned URL:", error);
+    res.status(500).json({ error: "Failed to generate presigned URL" });
   }
 };
 
