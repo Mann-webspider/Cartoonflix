@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"user-backend/internal/config"
@@ -11,11 +12,13 @@ import (
 )
 
 func main() {
-	// Load environment variables
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
+	// Load a local .env if present (optional; ignored in the cloud).
+	if err := godotenv.Load(".env"); err != nil {
+		log.Println("No .env file loaded, relying on environment")
 	}
+
+	// Pull secrets into env when running against AWS.
+	config.LoadSecrets(context.Background())
 
 	// Initialize Fiber app
 	app := fiber.New()
