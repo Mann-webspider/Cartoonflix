@@ -32,9 +32,12 @@ const main = async () => {
 
   const backend = process.env.BACKEND_URL;
   if (backend) {
+    const headers = { "content-type": "application/json" };
+    // Content writes require an admin token; pass one via BACKEND_TOKEN.
+    if (process.env.BACKEND_TOKEN) headers.authorization = `Bearer ${process.env.BACKEND_TOKEN}`;
     const res = await fetch(`${backend}/api/v1/admin/content/${contentId}`, {
       method: "PUT",
-      headers: { "content-type": "application/json" },
+      headers,
       body: JSON.stringify({ video_url: videoUrl, isReady: true, status: "ready" }),
     });
     console.log(`Marked ready via admin API: ${res.status}`);
