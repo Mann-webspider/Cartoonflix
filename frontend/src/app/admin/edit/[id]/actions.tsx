@@ -1,17 +1,14 @@
-import axios,{ AxiosResponse }  from "axios";
+"use server";
 
-export const getMovieEdit = async (id:string): Promise<{ data?: any, error?: string }> => {
-    try {
-      const res:AxiosResponse = await axios.get(`http://localhost:5000/api/v1/admin/content/${id}`);
-  
-      
-      if (res.status != 200) {
-        throw new Error(res.data.message);
-      }
-  
-      return {data:res.data.content};
-    } catch (error: any) {
-      return { error: error };
-    }
-  };
-  
+import { API_BASE } from "@/lib/config";
+
+export const getMovieEdit = async (id: string): Promise<{ data?: any; error?: string }> => {
+  try {
+    const res = await fetch(`${API_BASE}/content/${id}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Not found");
+    const json = await res.json();
+    return { data: json.content };
+  } catch (error: any) {
+    return { data: {}, error: String(error) };
+  }
+};

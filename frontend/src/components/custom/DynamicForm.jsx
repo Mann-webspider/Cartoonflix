@@ -13,8 +13,9 @@ import {
 import { TagsInput } from "react-tag-input-component";
 import { Button } from "@/components/ui/button";
 import {
-  handleMovieMetadata,
-  uploadToS3,
+  saveMetadata,
+  uploadAsset,
+  updateContent,
   handleMovieUpdate,
 } from "@/api/addMovie";
 
@@ -46,47 +47,46 @@ export default function DynamicForm({ initialData, isEdit = false }) {
     const form = document.getElementById("movieForm");
     const formData = new FormData(form);
     if (!file) {
-      toast({
-        title: `Please upload a ${type} file.`,
-      });
+      toast({ title: `Please upload a ${type} file.` });
       return;
     }
 
-    let prefix = formData.get("title");
-    const fileS3Url = await uploadToS3([file], prefix, setProgress, type);
+    const id = initialData?._id || objectId?.toString();
+    if (!id) {
+      toast({ title: "Generate a Movie Id first.", variant: "destructive" });
+      return;
+    }
 
-    console.log(`${type} S3 URL:`, fileS3Url);
-    const fallbackId = objectId.toString();
+    try {
+      // 1. Ensure the content doc exists (metadata) BEFORE uploading the movie,
+      //    so the transcode completion handler can update it.
+      await saveMetadata({
+        _id: id,
+        title: formData.get("title"),
+        description: formData.get("description"),
+        type: formData.get("type"),
+        releaseDate: formData.get("date"),
+        genres: selected,
+        tags: tag,
+        isPublish: formData.get("isPublish") === "on",
+        deleted: formData.get("isDeleted") === "on",
+      });
 
-    const fallbackTitle = formData.get("title");
+      // 2. Upload the asset. Movie -> raw bucket (transcode); images -> public.
+      const kind = type === "movie" ? "video" : "image";
+      const { publicUrl } = await uploadAsset(id, file, kind, setProgress);
 
-    const fallbackDescription = formData.get("description");
-    const fallbackType = formData.get("type");
-    const fallbackRelease = formData.get("date");
-    const fallbackIsPublish = formData.get("isPublish") === "on";
-    const fallbackIsDeleted = formData.get("isDeleted") === "on";
-    // If all metadata needs to be submitted after file upload
-    handleMovieMetadata(
-      {
-        id: initialData?._id || fallbackId,
-        title: initialData?.title || fallbackTitle,
-        description: initialData?.description || fallbackDescription,
-        type: initialData?.type || fallbackType,
-        releaseDate: initialData?.releaseDate || fallbackRelease,
-        isPublish: initialData?.isPublish ?? fallbackIsPublish,
-        isDeleted: initialData?.deleted ?? fallbackIsDeleted,
-      },
-      selected, // genres
-      tag, // tags
-      { ["key"]: fileS3Url["key"], keyType: fileS3Url["keyType"] } // Specify the file type (movie, thumbnail, or poster)// Only pass movie URL if it's a movie upload
-    );
+      // 3. For images, save the resulting public URL on the content.
+      if (type === "thumbnail") await updateContent(id, { thumbnail_url: publicUrl });
+      if (type === "poster") await updateContent(id, { poster_url: publicUrl });
 
-    toast({
-      title: "File upload",
-      description: `${
-        type.charAt(0).toUpperCase() + type.slice(1)
-      } uploaded successfully!`,
-    });
+      toast({
+        title: "File upload",
+        description: `${type.charAt(0).toUpperCase() + type.slice(1)} uploaded successfully!`,
+      });
+    } catch (e) {
+      toast({ title: e?.response?.data?.error || e.message, variant: "destructive" });
+    }
   };
 
   return (

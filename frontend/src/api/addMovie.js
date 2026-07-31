@@ -1,172 +1,70 @@
-import { z } from "zod";
-import axios from "axios"
-import {generateMovieId} from "@/lib/generateCode.js"
-const movieMetadataForm = z
-  .object({
-    _id:z.string().optional(),
-    title:z.string(),
-    description:z.string(),
-    type:z.enum(['movie',"series"]),
-    releaseDate:z.string().optional(),
-    genres:z.string().array(),
-    tags:z.string().array(),
-    video_id:z.number().optional(),
-    keyUrl:z.string().optional().default(""),
-    keyType:z.string().optional(),
-    isPublish:z.boolean().default(false).optional(),
-    deleted:z.boolean().default(false).optional(),
-  })
-  
-const createMovieMetadataForm = async (formData ,genre,tag,videoS3Url) => {
-    const rawFormData = {
-      _id:formData.id,
-      title: formData.title,
-      description: formData.description,
-      type:formData.type,
-      releaseDate:formData.releaseDate,
-      genres: genre,
-      tags:tag, 
-      video_id: generateMovieId(formData.title,formData.type),
-      
-      keyUrl:videoS3Url['key'],
-      keyType:videoS3Url['keyType'],
-      isPublish:formData.isPublish,
-      deleted:formData.isDeleted,
-    };
-    
-    console.log(rawFormData);
-    
-    try {
-    const validate = movieMetadataForm.safeParse(rawFormData);
-    if (!validate.success) {
-      console.log(validate.error.issues[0].message);
-    }
-    
-    
-    
-      const data = await axios.post("http://localhost:5000/api/v1/admin/content",validate.data,{
-          
-          
-          headers:{
-              "Content-type":"application/json"
-          },
-          cache:"no-cache"
-        })
-        
-      const res =await data.data
-      if(data.status != 201 ){
-          throw new Error(res.message)
-      }
-      
-      return res
-  
-        
-    } catch (error) {
-      return {error:error.message};
-      
-    }
-    
+"use client";
+import axios from "axios";
+import { getCookie } from "cookies-next";
+import { generateMovieId } from "@/lib/generateCode.js";
+import { API_BASE, TOKEN_COOKIE } from "@/lib/config";
+
+const authHeaders = () => {
+  const token = getCookie(TOKEN_COOKIE);
+  return {
+    "Content-type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
-  export const handleMovieMetadata = async (formData,genre,tag,videoS3Url) => {
-    
-    
-    const result = await createMovieMetadataForm(formData, genre,tag,videoS3Url);
-    console.log(result);
+};
 
-    // if(result.error){
-    //     toast({title:result.error,variant:"destructive"})
-    //     return
-    // }
-    // toast({title:result.message,variant:"success"})
+// Idempotent create/update of content metadata (must exist before the movie is
+// uploaded, so the transcode-completion handler can find the doc).
+export const saveMetadata = async (meta) => {
+  const body = {
+    _id: meta._id,
+    title: meta.title,
+    description: meta.description,
+    type: meta.type,
+    releaseDate: meta.releaseDate,
+    genres: meta.genres || [],
+    tags: meta.tags || [],
+    video_id: meta.video_id || generateMovieId(meta.title, meta.type),
+    isPublish: !!meta.isPublish,
+    deleted: !!meta.deleted,
   };
+  const { data } = await axios.post(`${API_BASE}/content`, body, { headers: authHeaders() });
+  return data;
+};
 
-  export const handleMovieUpdate= async (formData,genre,tag)=>{
-    const rawFormData = {
-      
-      title: formData.target['title'].value,
-      description: formData.target['description'].value,
-      type:formData.target['type'].value,
-      genres: genre,
-      tags:tag,
-      releaseDate:formData.target["date"].value,
-      isPublish:formData.target['isPublish'].checked,
-      deleted:formData.target['isDeleted'].checked,
-    };
-    console.log(formData.target["date"].value);
-    
-    try {
-      const validate = movieMetadataForm.safeParse(rawFormData);
-      if (!validate.success) {
-        console.log(validate.error.issues[0].message);
-      }
-      
-      
-        let id = formData.target['id'].value
-        const {data} = await axios.put(`http://localhost:5000/api/v1/admin/content/${id}`,validate.data,{
-            
-            
-            headers:{
-                "Content-type":"application/json"
-            },
-            cache:"no-cache"
-          })
-          console.log(data);
-          
-        const res =await data.content
-        if(data.status != 201 ){
-            throw new Error(data.message)
-        }
-        
-        return res
-    
-          
-      } catch (error) {
-        return {error:error.message};
-        
-      }
+// Presign + upload one asset. kind "video" -> raw bucket (triggers transcode);
+// kind "image" -> public poster path. Returns { key, publicUrl }.
+export const uploadAsset = async (contentId, file, kind, setProgress) => {
+  const { data } = await axios.post(
+    `${API_BASE}/presigned-url`,
+    { contentId, fileName: file.name, fileType: file.type, kind },
+    { headers: authHeaders() }
+  );
+  await axios.put(data.uploadUrl, file, {
+    headers: { "Content-Type": file.type },
+    onUploadProgress: (e) => {
+      if (setProgress && e.total) setProgress(Math.round((e.loaded / e.total) * 100));
+    },
+  });
+  return { key: data.key, publicUrl: data.publicUrl };
+};
 
-  }
+export const updateContent = async (id, patch) => {
+  const { data } = await axios.put(`${API_BASE}/content/${id}`, patch, { headers: authHeaders() });
+  return data;
+};
 
-  export const uploadToS3 = async (files,prefix,setProgress,type) => {
-    try {
-      const uploadPromises = files.map(async (file) => {
-        const response = await axios.post(
-          "http://localhost:5000/api/v1/admin/presigned-url",
-          {
-            
-            
-             fileName: file.name, fileType: file.type ,prefix
-          }
-        );
-  
-        const { uploadUrl } = await response.data;
-  
-        const uploadResponse = await axios.put(uploadUrl,file, {
-          
-          headers: { "Content-Type": file.type ,ContentEncoding: 'base64'},
-          
-          onUploadProgress: (progressEvent) => {
-            if (setProgress) {
-              const progress = Math.round(
-                (progressEvent.loaded / progressEvent.total) * 100
-              );
-              setProgress(progress);
-            }
-          },
-        });
-  
-        // const type = file.type === "video/mp4" || file.type === "video/x-matroska"? "movie" : "thumbnail";
-        return { ["key"]: uploadUrl.split("?")[0],
-          keyType:type
-         };
-      });
-  
-      const uploadResults = await Promise.all(uploadPromises);
-      const presign = uploadResults.reduce((acc, result) => ({ ...acc, ...result }), {});
-  
-      return presign; 
-    } catch (e) {
-      console.log("error in upload", e);
-      return {}; // Return an empty object in case of an error
-    }
-  };
+// Edit-form submit: update metadata + flags.
+export const handleMovieUpdate = async (formEvent, genre, tag) => {
+  const t = formEvent.target;
+  const id = t["id"].value;
+  return updateContent(id, {
+    title: t["title"].value,
+    description: t["description"].value,
+    type: t["type"].value,
+    releaseDate: t["date"].value,
+    genres: genre,
+    tags: tag,
+    isPublish: t["isPublish"].checked,
+    deleted: t["isDeleted"].checked,
+  });
+};

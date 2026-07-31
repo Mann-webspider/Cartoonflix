@@ -17,7 +17,7 @@ export default function Sidebar() {
                     const isActive = (pathName.includes(link.route) && link.route.length > 6) || pathName === link.route
                     return(
 
-                        <li ><Link className={`w-full flex justify-center text-md font-medium gap-4 py-6 px-4 rounded-xl   ${isActive?"bg-primary text-primary-foreground":""}`} id={link.label}  href={link.route}> {link.icons} <p className="max-lg:hidden">{link.label}</p></Link></li>
+                        <li key={link.label}><Link className={`w-full flex justify-center text-md font-medium gap-4 py-6 px-4 rounded-xl   ${isActive?"bg-primary text-primary-foreground":""}`} id={link.label}  href={link.route}> {link.icons} <p className="max-lg:hidden">{link.label}</p></Link></li>
                     )
 })}
                 
