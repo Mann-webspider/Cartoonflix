@@ -1,83 +1,68 @@
-"use client"
-import Link from "next/link"
+"use client";
 
-import { Button } from "@/components/ui/button"
-import {
-          Card,
-          CardContent,
-          CardDescription,
-          CardHeader,
-          CardTitle,
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { createUserRegisterForm } from "../actions"
-import { useToast } from "@/components/ui/use-toast"
-export default function Page() {
-    const { toast } = useToast()
-    const handleRegister = async (formData:FormData)=>{
-        const result = await createUserRegisterForm(formData);
-        if(result.error){
-            toast({title:result.error,variant:"destructive"})
-            return
-        }
-        toast({title:result.message,variant:"success"})
-        console.log(result);
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { signup } from "@/lib/adminApi";
+
+export default function SignupPage() {
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setBusy(true);
+    try {
+      await signup(name, email, password);
+      router.push("/admin");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
     }
-    return (
-        <div className="h-screen">
-            <div className="container flex justify-center items-center h-screen">
+  };
 
-        
-        
-            <Card className="mx-auto max-w-sm">
-              <CardHeader>
-                <CardTitle className="text-xl">Sign Up</CardTitle>
-                <CardDescription>
-                  Enter your information to create an account
-                </CardDescription>
-              </CardHeader>
-              <form action={handleRegister}>
-
-              <CardContent>
-                <div className="grid gap-4">
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="first-name">Username</Label>
-                      <Input id="first-name" name="username" placeholder="Max" required />
-                    </div>
-                
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      name="email"
-                      placeholder="m@example.com"
-                      required
-                      />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input id="password" type="password" name="password" />
-                  </div>
-                  <Button type="submit" className="w-full">
-                    Create an account
-                  </Button>
-                  
-                </div>
-                <div className="mt-4 text-center text-sm">
-                  Already have an account?{" "}
-                  <Link href="/auth/login" className="underline">
-                    Login
-                  </Link>
-                </div>
-              </CardContent>
-                      </form>
-            </Card>
-          
-                      </div>
-        </div>
-    );
+  return (
+    <div className="flex min-h-screen items-center justify-center px-6">
+      <div className="w-full max-w-sm rounded-xl border border-border bg-card p-8">
+        <h1 className="text-2xl font-semibold tracking-tight">Create account</h1>
+        <p className="mt-1 mb-6 text-sm text-muted-foreground">
+          The first account can be promoted to admin.
+        </p>
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <input
+            required placeholder="Name" value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="rounded-lg border border-input bg-background px-4 py-3 focus:border-ring"
+          />
+          <input
+            type="email" required placeholder="Email" value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="rounded-lg border border-input bg-background px-4 py-3 focus:border-ring"
+          />
+          <input
+            type="password" required minLength={6} placeholder="Password (min 6)" value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="rounded-lg border border-input bg-background px-4 py-3 focus:border-ring"
+          />
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <button
+            disabled={busy}
+            className="rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+          >
+            {busy ? "Creating…" : "Create account"}
+          </button>
+        </form>
+        <p className="mt-4 text-sm text-muted-foreground">
+          Have an account?{" "}
+          <Link href="/auth/login" className="text-primary hover:underline">Sign in</Link>
+        </p>
+      </div>
+    </div>
+  );
 }

@@ -1,79 +1,61 @@
 "use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { createUserLoginForm } from "../actions";
-import { useToast } from "@/components/ui/use-toast";
+import { useRouter } from "next/navigation";
+import { login } from "@/lib/adminApi";
 
-export default function Page() {
-    const { toast } = useToast()
-    const handleUserLogin = async (formData:FormData)=>{
-        const result = await createUserLoginForm(formData);
-        if(result.error){
-            toast({title:result.error,variant:"destructive"})
-            return
-        }
-        toast({title:result.message,variant:"success"})
-        console.log(result);
+export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setBusy(true);
+    try {
+      await login(email, password);
+      router.push("/admin");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
     }
-  return (
-    <div className={` h-screen`}>
-      <div className={`container  flex items-center justify-center h-screen`}>
-        <Card className={`mx-auto max-w-sm`}>
-          <CardHeader>
-            <CardTitle className="text-2xl">Login</CardTitle>
-            <CardDescription>
-              Enter your email below to login to your account
-            </CardDescription>
-          </CardHeader>
-          <form action={handleUserLogin}>
+  };
 
-          <CardContent>
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  name="email"
-                  placeholder="m@example.com"
-                  required
-                  />
-              </div>
-              <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    href="/auth/forgot-password"
-                    className="ml-auto inline-block text-sm underline"
-                    >
-                    Forgot your password?
-                  </Link>
-                </div>
-                <Input id="password" type="password" name="password" required />
-              </div>
-              <Button type="submit" className="w-full">
-                Login
-              </Button>
-              
-            </div>
-            <div className="mt-4 text-center text-sm">
-              Don&apos;t have an account?{" "}
-              <Link href="/auth/signup" className="underline">
-                Sign up
-              </Link>
-            </div>
-          </CardContent>
+  return (
+    <div className="flex min-h-screen items-center justify-center px-6">
+      <div className="w-full max-w-sm rounded-xl border border-border bg-card p-8">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Cartoon<span className="text-primary">Flix</span> admin
+        </h1>
+        <p className="mt-1 mb-6 text-sm text-muted-foreground">Sign in to the dashboard.</p>
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <input
+            type="email" required placeholder="Email" value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="rounded-lg border border-input bg-background px-4 py-3 focus:border-ring"
+          />
+          <input
+            type="password" required placeholder="Password" value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="rounded-lg border border-input bg-background px-4 py-3 focus:border-ring"
+          />
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <button
+            disabled={busy}
+            className="rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+          >
+            {busy ? "Signing in…" : "Sign in"}
+          </button>
         </form>
-        </Card>
+        <p className="mt-4 text-sm text-muted-foreground">
+          Need an account?{" "}
+          <Link href="/auth/signup" className="text-primary hover:underline">Create one</Link>
+        </p>
       </div>
     </div>
   );
