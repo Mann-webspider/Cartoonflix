@@ -123,6 +123,7 @@ module "lambda" {
   subnet_ids      = data.aws_subnets.default.ids
   security_group  = aws_security_group.fargate.id
   raw_bucket_name = module.s3.raw_bucket_id
+  hls_bucket_name = module.s3.hls_bucket_id
 
   # packages
   admin_api_zip    = var.admin_api_lambda_zip

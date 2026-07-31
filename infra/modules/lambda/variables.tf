@@ -14,6 +14,7 @@ variable "container_name" { type = string }
 variable "subnet_ids" { type = list(string) }
 variable "security_group" { type = string }
 variable "raw_bucket_name" { type = string }
+variable "hls_bucket_name" { type = string }
 
 # packages
 variable "admin_api_zip" { type = string }

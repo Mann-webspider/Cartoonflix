@@ -55,6 +55,26 @@ resource "aws_cloudfront_distribution" "hls" {
     max_ttl     = 86400
   }
 
+  # Posters / thumbnails are public (no signing) so <img> tags load directly.
+  ordered_cache_behavior {
+    path_pattern           = "posters/*"
+    target_origin_id       = local.origin_id
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+
+    forwarded_values {
+      query_string = false
+      cookies {
+        forward = "none"
+      }
+    }
+
+    min_ttl     = 0
+    default_ttl = 86400
+    max_ttl     = 604800
+  }
+
   restrictions {
     geo_restriction {
       restriction_type = "none"

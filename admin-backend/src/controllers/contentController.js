@@ -5,11 +5,19 @@ const Content = require("../models/contentModel");
 // id so the client can presign the upload under `<id>/<filename>`.
 exports.addContent = async (req, res) => {
   try {
-    const content = await Content.create({
-      ...req.body,
-      status: "pending",
-      isReady: false,
-    });
+    const { _id, ...rest } = req.body;
+    let content;
+    if (_id) {
+      // Idempotent upsert so the client can create the doc before/while
+      // uploading movie + poster + thumbnail under the same id.
+      content = await Content.findByIdAndUpdate(
+        _id,
+        { $set: rest, $setOnInsert: { status: "pending", isReady: false } },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
+    } else {
+      content = await Content.create({ ...rest, status: "pending", isReady: false });
+    }
     res.status(201).json({ id: content._id, content });
   } catch (err) {
     console.error(err);

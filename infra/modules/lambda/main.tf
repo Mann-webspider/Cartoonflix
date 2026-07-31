@@ -161,10 +161,14 @@ resource "aws_iam_role_policy" "admin_api" {
         Resource = [var.mongo_secret_arn, var.jwt_secret_arn]
       },
       {
-        # credentials must allow the operation being presigned
-        Effect   = "Allow"
-        Action   = ["s3:PutObject"]
-        Resource = "arn:aws:s3:::${var.raw_bucket_name}/*"
+        # credentials must allow the operations being presigned:
+        # movies -> raw bucket, posters/thumbnails -> hls bucket under posters/
+        Effect = "Allow"
+        Action = ["s3:PutObject"]
+        Resource = [
+          "arn:aws:s3:::${var.raw_bucket_name}/*",
+          "arn:aws:s3:::${var.hls_bucket_name}/posters/*",
+        ]
       }
     ]
   })
@@ -180,9 +184,11 @@ resource "aws_lambda_function" "admin_api" {
 
   environment {
     variables = {
-      MONGO_SECRET_ARN = var.mongo_secret_arn
-      JWT_SECRET_ARN   = var.jwt_secret_arn
-      RAW_BUCKET       = var.raw_bucket_name
+      MONGO_SECRET_ARN  = var.mongo_secret_arn
+      JWT_SECRET_ARN    = var.jwt_secret_arn
+      RAW_BUCKET        = var.raw_bucket_name
+      HLS_BUCKET        = var.hls_bucket_name
+      CLOUDFRONT_DOMAIN = var.cloudfront_domain
     }
   }
 }
