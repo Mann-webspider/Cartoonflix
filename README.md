@@ -130,4 +130,5 @@ terraform init && terraform plan && terraform apply
 - [x] Phase 2 — Terraform infra + CI/CD
 - [x] Phase 3 — serverless API (admin + user Lambdas) + on-demand/local transcode pipeline
 - [x] Phase 4a — JWT auth (users/admins), schema redesign (users, watch history), search, CloudWatch dashboard + DLQ alarm
-- [ ] Phase 4b — viewer UI buildout, admin dashboard polish, recommendations
+- [x] Phase 4b — viewer app redesign (minimal ink+mocha UI, hls.js player, search, auth), API-driven with demo fallback
+- [x] Phase 4c — admin dashboard redesign (shared ink+mocha theme, JWT auth, content CRUD + presigned upload)
