@@ -24,6 +24,7 @@ variable "completion_zip" { type = string }
 # runtime config
 variable "mongo_secret_arn" { type = string }
 variable "cf_key_secret_arn" { type = string }
+variable "jwt_secret_arn" { type = string }
 variable "cloudfront_domain" { type = string }
 variable "cf_key_group_id" { type = string }
 variable "cf_public_key_id" { type = string }

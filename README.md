@@ -129,4 +129,5 @@ terraform init && terraform plan && terraform apply
 - [x] Phase 1 — security hardening, monorepo cleanup, key rotation
 - [x] Phase 2 — Terraform infra + CI/CD
 - [x] Phase 3 — serverless API (admin + user Lambdas) + on-demand/local transcode pipeline
-- [ ] Phase 4 — schema redesign, auth, viewer UI, search & recommendations, observability
+- [x] Phase 4a — JWT auth (users/admins), schema redesign (users, watch history), search, CloudWatch dashboard + DLQ alarm
+- [ ] Phase 4b — viewer UI buildout, admin dashboard polish, recommendations

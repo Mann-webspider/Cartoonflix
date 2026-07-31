@@ -158,7 +158,7 @@ resource "aws_iam_role_policy" "admin_api" {
       {
         Effect   = "Allow"
         Action   = ["secretsmanager:GetSecretValue"]
-        Resource = var.mongo_secret_arn
+        Resource = [var.mongo_secret_arn, var.jwt_secret_arn]
       },
       {
         # credentials must allow the operation being presigned
@@ -181,6 +181,7 @@ resource "aws_lambda_function" "admin_api" {
   environment {
     variables = {
       MONGO_SECRET_ARN = var.mongo_secret_arn
+      JWT_SECRET_ARN   = var.jwt_secret_arn
       RAW_BUCKET       = var.raw_bucket_name
     }
   }
@@ -204,7 +205,7 @@ resource "aws_iam_role_policy" "user_api" {
       {
         Effect   = "Allow"
         Action   = ["secretsmanager:GetSecretValue"]
-        Resource = [var.mongo_secret_arn, var.cf_key_secret_arn]
+        Resource = [var.mongo_secret_arn, var.cf_key_secret_arn, var.jwt_secret_arn]
       }
     ]
   })
@@ -222,6 +223,7 @@ resource "aws_lambda_function" "user_api" {
     variables = {
       MONGO_SECRET_ARN      = var.mongo_secret_arn
       CF_KEY_SECRET_ARN     = var.cf_key_secret_arn
+      JWT_SECRET_ARN        = var.jwt_secret_arn
       CLOUDFRONT_KEYPAIR_ID = var.cf_public_key_id
       CLOUDFRONT_DOMAIN     = var.cloudfront_domain
     }
