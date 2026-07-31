@@ -25,6 +25,17 @@ func AddComment(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request payload"})
 	}
 
+	// User identity comes from the token, never the request body.
+	uid, _ := c.Locals("user_id").(string)
+	if uid == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	comment.UserID = uid
+
+	if comment.ContentID == "" || comment.Text == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "content_id and text are required"})
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

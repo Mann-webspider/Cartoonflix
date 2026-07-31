@@ -8,6 +8,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Preference struct {
@@ -24,22 +25,32 @@ func AddPreference(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request payload"})
 	}
 
+	// User identity comes from the token.
+	uid, _ := c.Locals("user_id").(string)
+	if uid == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	preference.UserID = uid
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	_, err := collection.InsertOne(ctx, preference)
+	// Upsert so a user has one document per preference type.
+	filter := bson.M{"user_id": uid, "type": preference.Type}
+	update := bson.M{"$set": bson.M{"items": preference.Items}}
+	_, err := collection.UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
 	if err != nil {
-		log.Printf("Error adding preference: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to add preference"})
+		log.Printf("Error saving preference: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to save preference"})
 	}
 
-	return c.JSON(fiber.Map{"message": "Preference added successfully"})
+	return c.JSON(fiber.Map{"message": "Preference saved"})
 }
 
 func GetPreferences(c *fiber.Ctx) error {
-	userID := c.Query("user_id")
+	userID, _ := c.Locals("user_id").(string)
 	if userID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "User ID is required"})
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
 	}
 
 	collection := config.GetCollection("streaming-platform", "preferences")

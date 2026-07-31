@@ -15,7 +15,8 @@ import (
 func LoadSecrets(ctx context.Context) {
 	mongoArn := os.Getenv("MONGO_SECRET_ARN")
 	cfArn := os.Getenv("CF_KEY_SECRET_ARN")
-	if mongoArn == "" && cfArn == "" {
+	jwtArn := os.Getenv("JWT_SECRET_ARN")
+	if mongoArn == "" && cfArn == "" && jwtArn == "" {
 		return
 	}
 
@@ -40,4 +41,5 @@ func LoadSecrets(ctx context.Context) {
 
 	fetch(mongoArn, "MONGO_URI")
 	fetch(cfArn, "CLOUDFRONT_PRIVATE_KEY")
+	fetch(jwtArn, "JWT_SECRET")
 }

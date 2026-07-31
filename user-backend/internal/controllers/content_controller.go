@@ -8,6 +8,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Content struct {
@@ -44,6 +45,43 @@ func GetContent(c *fiber.Ctx) error {
 
 	if err = cursor.All(ctx, &contents); err != nil {
 		log.Printf("Error parsing content: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse content"})
+	}
+
+	return c.JSON(fiber.Map{"count": len(contents), "data": contents})
+}
+
+// SearchContent does a case-insensitive match on title, genres and tags.
+func SearchContent(c *fiber.Ctx) error {
+	q := c.Query("q")
+	if q == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "query 'q' is required"})
+	}
+
+	collection := config.GetCollection("streaming-platform", "contents")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	rx := primitive.Regex{Pattern: q, Options: "i"}
+	filter := bson.M{
+		"deleted":   false,
+		"isPublish": true,
+		"$or": []bson.M{
+			{"title": rx},
+			{"genres": rx},
+			{"tags": rx},
+		},
+	}
+
+	cursor, err := collection.Find(ctx, filter)
+	if err != nil {
+		log.Printf("Error searching content: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to search content"})
+	}
+	defer cursor.Close(ctx)
+
+	var contents []Content
+	if err = cursor.All(ctx, &contents); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse content"})
 	}
 
