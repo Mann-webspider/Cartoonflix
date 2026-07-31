@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const preferenceController = require('../controllers/preferenceController');
+const { requireAuth } = require('../middleware/auth');
 
-// Routes for user preference management
-router.post('/preference', preferenceController.addPreference);
+router.post('/preference', requireAuth, preferenceController.addPreference);
+router.get('/preference', requireAuth, preferenceController.getPreferences);
 
 module.exports = router;
