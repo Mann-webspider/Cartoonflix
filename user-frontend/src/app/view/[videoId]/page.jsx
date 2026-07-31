@@ -1,52 +1,42 @@
-import { getMovieByVideoId } from "./actions";
-import VideoPlayer from "./VideoPlayer";
-import "./style.css";
+"use client";
 
-export default async function Page({ params }) {
-  const { videoId } = params;
+import { use, useEffect, useState } from "react";
+import Player from "@/components/Player";
+import { getContentByVideoId } from "@/lib/api";
 
-  const movie = await getMovieByVideoId(videoId);
+export default function ViewPage({ params }) {
+  const { videoId } = use(params);
+  const [movie, setMovie] = useState(undefined);
 
+  useEffect(() => {
+    getContentByVideoId(videoId).then(setMovie);
+  }, [videoId]);
+
+  if (movie === undefined) {
+    return <div className="flex h-[60vh] items-center justify-center text-muted">Loading…</div>;
+  }
   if (!movie) {
-    return (
-      <p className="text-white text-center mt-10">
-        Movie not found
-      </p>
-    );
+    return <div className="flex h-[60vh] items-center justify-center text-muted">Content not found.</div>;
   }
 
   return (
-    <section className="container mx-auto">
-      <div className="w-full h-screen flex-col justify-around my-8">
-        {/* Client Component */}
-        <VideoPlayer movie={movie} videoId={videoId} />
+    <div className="mx-auto max-w-5xl px-6 py-8">
+      <Player src={movie.video_url} videoId={videoId} />
 
-        {/* Movie Info */}
-        <div
-          id="description"
-          className="flex-cols xl:w-2/4 h-fit my-6 mx-4 text-gray-400 mr-12 xl:tracking-wider"
-        >
-          <p className="font-semibold xl:text-3xl text-xl text-gray-300 pb-6">
-            {movie.title}
-          </p>
-
-          <p className="w-full text-md xl:text-lg leading-6">
-            {movie.description}
-          </p>
-
-          <p className="pt-8 leading-7">Type: {movie.type}</p>
-          <p className="leading-7">Duration: {movie.duration}</p>
-
-          <p className="leading-7">
-            Genres:{" "}
-            <span className="underline underline-offset-8 capitalize">
-              {Array.isArray(movie.genres)
-                ? movie.genres.join(" - ")
-                : "N/A"}
+      <div className="mt-6">
+        <h1 className="text-2xl font-semibold tracking-tight">{movie.title}</h1>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {(movie.genres || []).map((g) => (
+            <span key={g} className="rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs text-muted">
+              {g}
             </span>
-          </p>
+          ))}
         </div>
+        <p className="mt-4 max-w-3xl leading-relaxed text-muted">{movie.description}</p>
+        <p className="mt-4 text-sm text-muted">
+          Type: <span className="text-text capitalize">{movie.type}</span>
+        </p>
       </div>
-    </section>
+    </div>
   );
 }

@@ -1,31 +1,66 @@
-import Image from "next/image";
-import Link from "next/link"
-import { Menu, Search } from "lucide-react"
-import React from "react";
-import logo from "../../public/logo/fontbolt.png"
-import Songlist from "./Songlist";
-function Navbar() {
-  return (
-    <header className="flex items-center gap-4 p-4 bg-[#1C122B]">
-        <button className="text-gray-400 hover:text-white">
-          <Menu className="h-6 w-6" />
-        </button>
-        <Link href="/" className="text-white text-xl font-bold">
-          <Image src={logo} width={200} height={100}/>
-        </Link>
-        <div className="relative flex-1 max-w-xs">
-          <input
-            type="search"
-            placeholder="Search"
-            className="w-full bg-gray-700/50 rounded px-4 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-          />
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        </div>
-          <Songlist/>
-        <div className="h-8 w-8 rounded-full bg-gray-400" />
-      </header>
+"use client";
 
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { Search, LogOut } from "lucide-react";
+import { getUser, logout } from "@/lib/auth";
+
+export default function Navbar() {
+  const [user, setUser] = useState(null);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    setUser(getUser());
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    onScroll();
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  return (
+    <header
+      className={`sticky top-0 z-50 transition-colors ${
+        scrolled ? "bg-bg/90 backdrop-blur border-b border-border" : "bg-gradient-to-b from-black/60 to-transparent"
+      }`}
+    >
+      <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <Link href="/" className="flex items-center gap-2">
+          <span className="text-lg font-semibold tracking-tight">
+            Cartoon<span className="text-accent">Flix</span>
+          </span>
+        </Link>
+
+        <div className="flex items-center gap-6 text-sm">
+          <Link href="/" className="text-muted hover:text-text transition-colors">
+            Home
+          </Link>
+          <Link href="/search" className="flex items-center gap-1.5 text-muted hover:text-text transition-colors">
+            <Search size={16} /> Search
+          </Link>
+          {user ? (
+            <div className="flex items-center gap-3">
+              <span className="text-text">{user.name}</span>
+              <button
+                onClick={() => {
+                  logout();
+                  setUser(null);
+                }}
+                className="text-muted hover:text-text"
+                aria-label="Sign out"
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="rounded-md bg-accent px-3 py-1.5 font-medium text-black hover:bg-accent-hover transition-colors"
+            >
+              Sign in
+            </Link>
+          )}
+        </div>
+      </nav>
+    </header>
   );
 }
-
-export default Navbar;
