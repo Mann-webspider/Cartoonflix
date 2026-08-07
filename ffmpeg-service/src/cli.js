@@ -1,52 +1,89 @@
 /**
- * Local transcode entrypoint — runs the SAME pipeline as the Fargate task on
- * your laptop, then marks the content ready via the admin API (since no ECS
- * completion event fires locally).
+ * Local media pipeline entrypoint.
  *
- * Usage:
- *   node src/cli.js --key <rawKey> --content <contentId>
- * Env: RAW_BUCKET, HLS_BUCKET, CLOUDFRONT_DOMAIN, BACKEND_URL, AWS_REGION
+ *   node src/cli.js ingest  --source ./movie.mp4 --content <id> [--season 1 --episode 2] [--thumbs 10]
+ *   node src/cli.js publish --content <id> [--season 1 --episode 2] [--poster 003.jpg] [--thumbnail 005.jpg]
+ *
+ * `ingest` transcodes to `media/<slug>/` and touches nothing remote.
+ * `publish` uploads that directory to S3 and prints the resulting URLs.
+ *
+ * With `--json`, progress and the result are written to stdout as NDJSON. That
+ * is the mode admin-backend runs, which is why this file — not a shared import —
+ * is the single implementation of the pipeline: a child process keeps the
+ * CommonJS API and this ESM package from having to agree on a module system.
  */
-import { run } from "./worker.js";
+import { ingest, slugFor, readManifest } from "./pipeline.js";
+import { publish } from "./publish.js";
 
-const arg = (flag) => {
-  const i = process.argv.indexOf(flag);
-  return i > -1 ? process.argv[i + 1] : undefined;
+const argv = process.argv.slice(2);
+const command = argv[0];
+
+const flag = (name) => {
+  const i = argv.indexOf(`--${name}`);
+  return i > -1 ? argv[i + 1] : undefined;
+};
+const has = (name) => argv.includes(`--${name}`);
+
+const asJson = has("json");
+const emit = (event) => {
+  if (asJson) console.log(JSON.stringify(event));
+  else if (event.type === "progress") process.stderr.write(`\r${event.stage} ${event.percent}%   `);
+  else console.log(JSON.stringify(event, null, 2));
+};
+
+const requireFlag = (name) => {
+  const value = flag(name);
+  if (!value) throw new Error(`--${name} is required`);
+  return value;
+};
+
+const slugFromFlags = () =>
+  slugFor({
+    contentId: requireFlag("content"),
+    season: flag("season") && Number(flag("season")),
+    episode: flag("episode") && Number(flag("episode")),
+  });
+
+const commands = {
+  async ingest() {
+    const slug = slugFromFlags();
+    const manifest = await ingest({
+      sourcePath: requireFlag("source"),
+      slug,
+      thumbnailCount: flag("thumbs") ? Number(flag("thumbs")) : undefined,
+      onProgress: ({ stage, percent }) => emit({ type: "progress", stage, percent }),
+    });
+    if (!asJson) process.stderr.write("\n");
+    emit({ type: "done", manifest });
+  },
+
+  async publish() {
+    const contentId = requireFlag("content");
+    const slug = slugFromFlags();
+    if (!readManifest(slug)) throw new Error(`No ingested job at media/${slug} — run ingest first`);
+
+    const result = await publish({
+      slug,
+      contentId,
+      hlsBucket: process.env.HLS_BUCKET,
+      cloudfrontDomain: process.env.CLOUDFRONT_DOMAIN,
+      poster: flag("poster"),
+      thumbnail: flag("thumbnail"),
+    });
+    emit({ type: "published", ...result });
+  },
 };
 
 const main = async () => {
-  const rawKey = arg("--key");
-  const contentId = arg("--content");
-  if (!rawKey || !contentId) {
-    console.error("Usage: node src/cli.js --key <rawKey> --content <contentId>");
+  const run = commands[command];
+  if (!run) {
+    console.error("Usage: node src/cli.js <ingest|publish> --content <id> [...]");
     process.exit(2);
   }
-
-  const { videoUrl } = await run({
-    rawBucket: process.env.RAW_BUCKET,
-    hlsBucket: process.env.HLS_BUCKET,
-    rawKey,
-    contentId,
-    cloudfrontDomain: process.env.CLOUDFRONT_DOMAIN,
-  });
-
-  const backend = process.env.BACKEND_URL;
-  if (backend) {
-    const headers = { "content-type": "application/json" };
-    // Content writes require an admin token; pass one via BACKEND_TOKEN.
-    if (process.env.BACKEND_TOKEN) headers.authorization = `Bearer ${process.env.BACKEND_TOKEN}`;
-    const res = await fetch(`${backend}/api/v1/admin/content/${contentId}`, {
-      method: "PUT",
-      headers,
-      body: JSON.stringify({ video_url: videoUrl, isReady: true, status: "ready" }),
-    });
-    console.log(`Marked ready via admin API: ${res.status}`);
-  } else {
-    console.log("BACKEND_URL not set — skipping ready update. video_url:", videoUrl);
-  }
+  await run();
 };
 
 main().catch((err) => {
-  console.error(err);
+  emit({ type: "error", message: err.message });
   process.exit(1);
 });

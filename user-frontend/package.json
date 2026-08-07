@@ -2,11 +2,13 @@
   "name": "user-frontend",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint src",
+    "test": "node --test src/**/*.test.mjs"
   },
   "dependencies": {
     "hls.js": "^1.5.17",

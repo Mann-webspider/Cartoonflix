@@ -1,9 +1,14 @@
 const mongoose = require('mongoose');
 
+// Episodes are only written once their transcode has been published, so a
+// video_url is always present by the time one reaches the database.
 const episodeSchema = new mongoose.Schema({
-  
   episode_number: { type: Number, required: true },
+  title: { type: String },
+  description: { type: String },
   video_url: { type: String, required: true },
+  thumbnail_url: { type: String },
+  duration_seconds: { type: Number },
 });
 
 const seasonSchema = new mongoose.Schema({
@@ -21,6 +26,7 @@ const contentSchema = new mongoose.Schema({
   releaseDate:{type:String},
   video_id:{type:Number},
   video_url: { type: String },
+  duration_seconds: { type: Number },
   thumbnail_url: { type: String },
   poster_url:{type:String},
   subtitle_url:{type:String},

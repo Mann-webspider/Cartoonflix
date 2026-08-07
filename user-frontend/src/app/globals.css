@@ -3,43 +3,282 @@
 @tailwind utilities;
 
 /*
-  Minimal, non-neon palette — ink + stone with a warm mocha accent.
-  Dark by default (a streaming app), calm and low-saturation.
+  Helvetica Now, self-hosted. Display for headings, Text for everything small —
+  that is what the two cuts are drawn for, and using Display at 14px is the
+  mistake the family exists to prevent.
 */
-:root {
-  --bg: #0b0b0c;
-  --surface: #161618;
-  --surface-2: #1e1e21;
-  --border: #2a2a2e;
-  --text: #ededed;
-  --muted: #9a9aa0;
-  --accent: #b08968;
-  --accent-hover: #c69c7b;
+@font-face {
+  font-family: "Helvetica Now Display";
+  src: url("/fonts/HelveticaNowDisplay-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "Helvetica Now Display";
+  src: url("/fonts/HelveticaNowDisplay-Black.woff2") format("woff2");
+  font-weight: 900;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "Helvetica Now Text";
+  src: url("/fonts/HelveticaNowText-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Helvetica Now Text";
+  src: url("/fonts/HelveticaNowText-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
 }
 
-* {
-  border-color: var(--border);
+:root {
+  /*
+    Colours are stored as space-separated RGB channels, not hex.
+    Tailwind can only composite an alpha modifier (bg-ink/85) onto a token it
+    can decompose; a bare `var(--x)` makes every `/NN` utility resolve to
+    nothing and silently vanish from the built stylesheet.
+
+    Dark by use scene, not by category: this is watched in the evening, in a
+    dim room. The ground carries a violet cast rather than neutral black so
+    the brand field reads as part of the same surface.
+  */
+  --ink: 11 10 15;
+  --surface: 20 18 25;
+  --surface-2: 29 26 36;
+
+  --text: 246 244 250;
+  /* Tinted from the ground's hue. Gray secondary text on a violet ground
+     reads as dirt. */
+  --text-dim: 162 155 180;
+
+  /* Brand owns whole regions — the primary action, the active season, the
+     continue-watching field — not scattered accents. --brand carries short,
+     large text only; anything with a paragraph on it uses --brand-deep, where
+     tinted white still clears 4.5:1. */
+  --brand: 108 77 255;
+  --brand-deep: 61 33 184;
+  --brand-bright: 138 114 255;
+  --brand-ink: 255 255 255;
+
+  /* Reserved for one job: how far through something you are. */
+  --ember: 255 176 32;
+
+  --line: rgb(246 244 250 / 0.1);
+  --line-strong: rgb(246 244 250 / 0.22);
+
+  --radius: 10px;
+
+  /* Exponential ease-out. Everything decelerates from an already-visible
+     default; nothing fades in from nothing. */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html {
+  scrollbar-color: rgb(var(--surface-2)) rgb(var(--ink));
+  scrollbar-width: thin;
 }
 
 body {
-  color: var(--text);
-  background: var(--bg);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: rgb(var(--text));
+  background: rgb(var(--ink));
+  font-family: "Helvetica Now Text", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 400;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-@layer utilities {
-  .no-scrollbar::-webkit-scrollbar { display: none; }
-  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+h1,
+h2,
+h3,
+.font-display {
+  font-family: "Helvetica Now Display", "Helvetica Now Text", ui-sans-serif, sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
 
-  .fade-right {
-    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
-    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+/*
+  Browser surfaces. These ship with defaults that belong to no design system,
+  and theming them is the cheapest proof a page was built rather than assembled.
+*/
+::selection {
+  background: rgb(var(--brand));
+  color: rgb(var(--brand-ink));
+}
+
+:where(input, textarea) {
+  caret-color: rgb(var(--brand-bright));
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: rgb(var(--ink));
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--surface-2));
+  border-radius: 999px;
+  border: 2px solid rgb(var(--ink));
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(43 38 53);
+}
+
+:where(a, button, input, [tabindex]):focus-visible {
+  outline: 2px solid rgb(var(--brand-bright));
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Durations and episode counts sit in columns; proportional digits make them
+   jitter as they change. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+  Player scrubber. A real range input, restyled: the browser's default gives
+  keyboard stepping and screen-reader announcement, and both are easy to get
+  wrong when rebuilt from divs.
+
+  Amber marks how far through the title you are — the same job it does on the
+  continue-watching cards, and its only job anywhere.
+*/
+.scrubber {
+  --track: 4px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+  height: 18px;
+}
+
+.scrubber::-webkit-slider-runnable-track {
+  height: var(--track);
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    rgb(var(--ember)) var(--played),
+    rgb(var(--text) / 0.3) var(--played) var(--buffered),
+    rgb(var(--text) / 0.12) var(--buffered)
+  );
+  transition: height 160ms var(--ease);
+}
+
+.scrubber::-moz-range-track {
+  height: var(--track);
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    rgb(var(--ember)) var(--played),
+    rgb(var(--text) / 0.3) var(--played) var(--buffered),
+    rgb(var(--text) / 0.12) var(--buffered)
+  );
+}
+
+/* The head stays out of the way until the viewer reaches for it. */
+.scrubber::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: calc((var(--track) - 13px) / 2);
+  border-radius: 999px;
+  background: rgb(var(--text));
+  opacity: 0;
+  transition:
+    opacity 160ms var(--ease),
+    transform 160ms var(--ease);
+}
+
+.scrubber::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(var(--text));
+  opacity: 0;
+  transition: opacity 160ms var(--ease);
+}
+
+/*
+  Volume is not progress, so it must not borrow amber — that colour answers
+  exactly one question on this surface, and it is "how far through are you".
+*/
+.scrubber--volume::-webkit-slider-runnable-track {
+  background: linear-gradient(
+    to right,
+    rgb(var(--text)) var(--played),
+    rgb(var(--text) / 0.2) var(--played)
+  );
+}
+.scrubber--volume::-moz-range-track {
+  background: linear-gradient(
+    to right,
+    rgb(var(--text)) var(--played),
+    rgb(var(--text) / 0.2) var(--played)
+  );
+}
+
+.scrubber:hover,
+.scrubber:focus-visible {
+  --track: 6px;
+}
+
+.scrubber:hover::-webkit-slider-thumb,
+.scrubber:focus-visible::-webkit-slider-thumb {
+  opacity: 1;
+}
+.scrubber:hover::-moz-range-thumb,
+.scrubber:focus-visible::-moz-range-thumb {
+  opacity: 1;
+}
+
+/* Loading placeholders breathe rather than blink. */
+@keyframes skeleton {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
   }
 }
 
-/* Restrained focus ring using the accent */
-:where(a, button, input):focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Keeps billboard artwork legible under the copy that sits on it. */
+  .billboard-scrim {
+    background:
+      linear-gradient(to top, rgb(var(--ink)) 4%, rgb(var(--ink) / 0.55) 45%, transparent 78%),
+      linear-gradient(to right, rgb(var(--ink)) 2%, rgb(var(--ink) / 0.82) 32%, transparent 68%);
+  }
+
+  .rail-fade-r {
+    -webkit-mask-image: linear-gradient(to right, #000 92%, transparent 100%);
+    mask-image: linear-gradient(to right, #000 92%, transparent 100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

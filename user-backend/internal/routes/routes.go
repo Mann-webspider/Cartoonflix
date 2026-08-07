@@ -14,13 +14,24 @@ func SetupRoutes(app *fiber.App) {
 
 	api := app.Group("/api/v1")
 
-	// Public reads
+	// Accounts. Viewers sign up here rather than against the admin API, which
+	// only runs on the operator's machine.
+	api.Post("/auth/signup", controllers.Signup)
+	api.Post("/auth/login", controllers.Login)
+	api.Get("/auth/me", middleware.RequireAuth, controllers.Me)
+
+	// Public catalogue
 	api.Get("/content", controllers.GetCollectionContent)
 	api.Get("/contents", controllers.GetContent)
+	api.Get("/contents/:id", controllers.GetSingleContent)
 	api.Get("/search", controllers.SearchContent)
 	api.Get("/comments", controllers.GetComments)
 
-	// Authenticated writes / user-scoped reads
+	// Personalisation — everything here is scoped to the token's user.
+	me := api.Group("/me", middleware.RequireAuth)
+	me.Get("/continue", controllers.ContinueWatching)
+	me.Put("/progress", controllers.SaveProgress)
+
 	api.Post("/preferences", middleware.RequireAuth, controllers.AddPreference)
 	api.Get("/preferences", middleware.RequireAuth, controllers.GetPreferences)
 	api.Post("/comments", middleware.RequireAuth, controllers.AddComment)

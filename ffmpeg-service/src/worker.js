@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { downloadFromS3 } from "./s3/download.js";
 import { uploadDir } from "./s3/upload.js";
+import { probe } from "./transcode/probe.js";
 import { transcodeToHLS } from "./transcode/hls.js";
 
 /**
@@ -29,7 +30,10 @@ export const run = async (job) => {
 
   try {
     await downloadFromS3(rawBucket, rawKey, input);
-    await transcodeToHLS(input, outDir);
+    const source = await probe(input);
+    await transcodeToHLS(input, outDir, source, ({ percent }) =>
+      console.log(`Transcoding: ${Math.round(percent ?? 0)}%`)
+    );
     await uploadDir(hlsBucket, outDir, contentId);
 
     const videoUrl = cloudfrontDomain

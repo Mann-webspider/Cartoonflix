@@ -1,8 +1,10 @@
 # CartoonFlix
 
-A Netflix-style streaming platform for animated content — built as a **cost-aware, event-driven, serverless** system. Raw uploads are transcoded into adaptive-bitrate HLS by **ephemeral compute that only exists while a job runs**, then delivered through CloudFront with time-limited signed URLs.
+A streaming platform for animated content, built to run at roughly the cost of S3 storage.
 
-> No always-on servers. No message broker to babysit. Transcoding runs on-demand in the cloud **or** on your own laptop from the same container image.
+The expensive part of a video service is transcoding. Here it happens on hardware you already own: the operator ingests a title on their own machine — probing it, building an adaptive HLS ladder, extracting stills to choose a poster from — and only the finished segments and the chosen artwork are ever uploaded. Nothing in the cloud runs when nobody is watching.
+
+> **Split by cost.** Everything expensive is local. Everything hosted is free-tier or pay-per-request: one Lambda, one Atlas cluster, S3 + CloudFront, and a static frontend on Vercel.
 
 ---
 
@@ -10,63 +12,53 @@ A Netflix-style streaming platform for animated content — built as a **cost-aw
 
 ```mermaid
 flowchart TB
-    subgraph Client
-        AF[Admin App<br/>Next.js]
-        UF[Viewer App<br/>Next.js]
+    subgraph local["Operator's machine — where the work happens"]
+        AF["Admin app<br/>Next.js"]
+        ADM["Admin API<br/>Node/Express"]
+        PIPE["Ingest pipeline<br/>ffprobe → HLS ladder → stills"]
+        DISK[("media/&lt;slug&gt;/<br/>source · hls · thumbs")]
     end
 
-    subgraph Edge / API
-        APIGW[API Gateway<br/>HTTP API]
-        CF[CloudFront<br/>signed URLs]
+    subgraph cloud["Hosted — pay-per-request or free tier"]
+        VF["Viewer app<br/>Next.js on Vercel"]
+        USR["Viewer API<br/>Lambda · Go/Fiber"]
+        DB[("MongoDB Atlas<br/>free tier")]
+        S3HLS[("S3 · HLS + posters")]
+        CF["CloudFront"]
     end
 
-    subgraph Serverless Backend
-        ADM[Admin API<br/>Lambda · Node]
-        USR[User API<br/>Lambda · Go/Fiber]
-        ORCH[Transcode Orchestrator<br/>Lambda]
-        DONE[Completion Handler<br/>Lambda]
-    end
+    AF -->|"details + source file"| ADM
+    ADM -->|spawns| PIPE
+    PIPE --> DISK
+    AF -->|"review stills, pick poster"| ADM
+    ADM -->|"publish: upload finished output"| S3HLS
+    ADM -->|"write location + metadata"| DB
 
-    subgraph Storage
-        S3RAW[(S3 · raw uploads)]
-        S3HLS[(S3 · HLS output)]
-        DB[(MongoDB Atlas<br/>serverless)]
-    end
-
-    subgraph Transcode · ephemeral
-        SQS[SQS + DLQ]
-        FAR[Fargate task<br/>ffmpeg/HLS container<br/>spun per job, then exits]
-        LOCAL[Local worker<br/>same image on laptop]
-    end
-
-    AF -->|presigned PUT| S3RAW
-    AF --> APIGW
-    UF --> APIGW
-    APIGW --> ADM
-    APIGW --> USR
-    ADM --> DB
+    VF --> USR
     USR --> DB
-    S3RAW -- ObjectCreated event --> ORCH --> SQS --> FAR
-    FAR -->|download raw| S3RAW
-    FAR -->|upload HLS| S3HLS
-    FAR -->|job done| DONE --> DB
-    LOCAL -->|download raw| S3RAW
-    LOCAL -->|upload HLS| S3HLS
-    LOCAL -->|mark ready| ADM
-    UF -->|playback| CF --> S3HLS
-    USR -->|sign URL| CF
+    VF -->|playback| CF --> S3HLS
 ```
 
-### How transcoding works
+### The ingest pipeline
 
-Two interchangeable paths run **the same container image**:
+One command, or one screen in the admin app, takes a source file to a published title:
 
-| Path | Trigger | Compute | Cost |
-|------|---------|---------|------|
-| **Cloud** | S3 `ObjectCreated` → orchestrator Lambda → SQS → `ecs RunTask` | Fargate task, exits when done | Pay only per job second |
-| **Local** | `make transcode VIDEO=<id>` on your machine | Your laptop (CPU or CUDA auto-detect) | Free |
+| Step | What happens | Where |
+|---|---|---|
+| **Probe** | `ffprobe` reads duration, dimensions, frame rate, audio presence | local |
+| **Transcode** | One ffmpeg pass emits 480p/720p/1080p with a fixed 2s GOP and ~10s segments, plus the master playlist | local |
+| **Stills** | Ten frames sampled across the middle 90% of the runtime | local |
+| **Review** | The operator picks a poster and a card image from the stills | local |
+| **Publish** | HLS tree and chosen stills go to S3; the location is written to MongoDB | the only cloud write |
 
-Both write HLS to the same S3 layout, so cloud and local are drop-in swappable. SQS gives retries + a dead-letter queue; no long-lived RabbitMQ broker.
+A few details that matter:
+
+- **One pass, not three.** The ladder is built with `-filter_complex split` and `-var_stream_map`, so the source is decoded once instead of once per rendition, and ffmpeg authors the master playlist itself.
+- **Keyframes are aligned.** Fixed GOP with scene-cut detection off means every rendition cuts at the same timestamps, which is what lets a player switch quality mid-stream without a stall.
+- **No upscaling.** A 720p source produces 480p and 720p — not a fake 1080p that costs bitrate and adds nothing.
+- **Series are first-class.** A movie is keyed by its content id; an episode by `<contentId>/s<N>e<N>`. The same string names the local folder and the S3 prefix, so publishing is a directory copy.
+
+The original event-driven cloud path (S3 event → orchestrator Lambda → SQS → Fargate) is still in `infra/` and still works. It is the fallback for machines that cannot transcode, not the default.
 
 ---
 
@@ -97,28 +89,59 @@ cartoonflix/
 
 ---
 
-## Local development
+## Running the ingest side
 
-Each service has a `.env.example` — copy to `.env` and fill in. Secrets (Mongo URI, CloudFront private key, AWS creds) never live in the repo.
+Each service has a `.env.example` — copy to `.env` and fill it in. `MEDIA_ROOT` must be the same folder in both `admin-backend` and `ffmpeg-service`.
 
 ```bash
-# admin API
 cd admin-backend && npm install && npm run dev
-# user API
-cd user-backend && go run ./cmd
-# viewer / admin apps
-cd user-frontend && npm install && npm run dev
-
-# transcode a video locally (same pipeline as the cloud), then mark it ready
-cd ffmpeg-service && npm install
-make transcode KEY=<contentId>/source.mp4 CONTENT=<contentId>
 ```
+
+```bash
+cd frontend && npm install && npm run dev -- -p 3001
+```
+
+Then open `http://localhost:3001/admin/new`, fill in the title, save the details, and use the media pipeline panel: choose a file, transcode, pick a poster from the extracted stills, publish.
+
+The same pipeline is available without the UI:
+
+```bash
+cd ffmpeg-service && npm install
+```
+
+```bash
+make ingest SOURCE=./movie.mp4 CONTENT=<contentId>
+```
+
+```bash
+make ingest SOURCE=./ep1.mp4 CONTENT=<contentId> SEASON=1 EPISODE=1
+```
+
+```bash
+make publish CONTENT=<contentId> POSTER=004.jpg THUMBNAIL=007.jpg
+```
+
+## Running the viewer side
+
+```bash
+cd user-backend && go run ./cmd
+```
+
+```bash
+cd user-frontend && npm install && npm run dev
+```
+
+With `NEXT_PUBLIC_API_URL` unset the viewer renders from a bundled sample catalogue, so the UI works with no backend at all.
 
 ## Deploy
 
+The viewer app deploys to Vercel as a static build. Everything else:
+
 ```bash
 cd infra
-cp terraform.tfvars.example terraform.tfvars   # fill in values
+```
+
+```bash
 terraform init && terraform plan && terraform apply
 ```
 
@@ -128,7 +151,11 @@ terraform init && terraform plan && terraform apply
 
 - [x] Phase 1 — security hardening, monorepo cleanup, key rotation
 - [x] Phase 2 — Terraform infra + CI/CD
-- [x] Phase 3 — serverless API (admin + user Lambdas) + on-demand/local transcode pipeline
-- [x] Phase 4a — JWT auth (users/admins), schema redesign (users, watch history), search, CloudWatch dashboard + DLQ alarm
-- [x] Phase 4b — viewer app redesign (minimal ink+mocha UI, hls.js player, search, auth), API-driven with demo fallback
-- [x] Phase 4c — admin dashboard redesign (shared ink+mocha theme, JWT auth, content CRUD + presigned upload)
+- [x] Phase 3 — serverless API (admin + user Lambdas) + on-demand transcode pipeline
+- [x] Phase 4 — JWT auth, search, observability, admin dashboard, viewer app
+- [x] Phase 5 — local-first ingest: single-pass keyframe-aligned HLS ladder, still extraction and poster selection, series/episode support, publish-to-S3 as an explicit step; viewer accounts and continue-watching moved into the Go Lambda; viewer app rebuilt
+
+### Known limitations
+
+- HLS is served publicly through CloudFront. Signed URLs do not work for HLS — the player fetches every segment separately and only the master playlist would carry the signature. Signed *cookies* are the correct fix and need a custom domain so the Vercel app and the CloudFront distribution can share a parent-domain cookie.
+- Ingest progress lives in the admin server's memory, so restarting it mid-transcode loses the progress bar (the transcode itself continues, and the finished job is recovered from its manifest).

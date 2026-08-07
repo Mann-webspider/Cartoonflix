@@ -1,12 +1,13 @@
 {
   "name": "ffmpeg-service",
   "version": "2.0.0",
-  "description": "One-shot HLS transcode worker + transcode orchestration lambdas",
+  "description": "Local HLS ingest pipeline + one-shot cloud transcode worker + orchestration lambdas",
   "type": "module",
   "main": "src/worker.js",
   "scripts": {
     "start": "node src/worker.js",
-    "transcode": "node src/cli.js",
+    "ingest": "node src/cli.js ingest",
+    "publish": "node src/cli.js publish",
     "package:lambdas": "node scripts/package-lambdas.mjs",
     "test": "node --test"
   },
@@ -15,7 +16,7 @@
     "@aws-sdk/client-s3": "^3.717.0",
     "@aws-sdk/client-secrets-manager": "^3.717.0",
     "ffmpeg-static": "^5.2.0",
-    "fluent-ffmpeg": "^2.1.3",
+    "ffprobe-static": "^3.1.0",
     "mongodb": "^6.12.0",
     "p-limit": "^6.2.0"
   },

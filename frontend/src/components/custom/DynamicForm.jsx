@@ -31,59 +31,76 @@ import {
 } from "@/components/ui/tooltip";
 
 import { useToast } from "@/components/ui/use-toast";
+import IngestPanel from "@/components/custom/IngestPanel";
 
 export default function DynamicForm({ initialData, isEdit = false }) {
   const [selected, setSelected] = useState([]);
   const [tag, setTag] = useState([]);
   const [posterFile, setPosterFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
-  const [movieFile, setMovieFile] = useState(null);
   const [progress, setProgress] = useState(0);
   const [isPublish, setIsPublish] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
   const [objectId, setObjectId] = useState("");
+  const [contentType, setContentType] = useState(initialData.type || "movie");
+  const [detailsSaved, setDetailsSaved] = useState(Boolean(initialData._id));
   const { toast } = useToast();
-  const handleFileSubmit = async (file, type) => {
-    const form = document.getElementById("movieForm");
-    const formData = new FormData(form);
-    if (!file) {
-      toast({ title: `Please upload a ${type} file.` });
+
+  const contentId = initialData?._id || objectId?.toString() || "";
+
+  // Metadata is read straight off the form so the same values feed both the
+  // save button and the per-asset uploads below.
+  const readForm = () => {
+    const formData = new FormData(document.getElementById("movieForm"));
+    return {
+      title: formData.get("title"),
+      description: formData.get("description"),
+      type: formData.get("type"),
+      releaseDate: formData.get("date"),
+      genres: selected,
+      tags: tag,
+      isPublish: formData.get("isPublish") === "on",
+      deleted: formData.get("isDeleted") === "on",
+    };
+  };
+
+  // The content document must exist before ingest: the pipeline writes the
+  // finished HLS location back onto it.
+  const handleSaveDetails = async () => {
+    if (!contentId) {
+      toast({ title: "Generate a Movie Id first.", variant: "destructive" });
       return;
     }
+    try {
+      await saveMetadata({ _id: contentId, ...readForm() });
+      setDetailsSaved(true);
+      toast({ title: "Details saved", description: "You can now transcode the video." });
+    } catch (e) {
+      toast({ title: e?.response?.data?.error || e.message, variant: "destructive" });
+    }
+  };
 
-    const id = initialData?._id || objectId?.toString();
-    if (!id) {
+  // Optional override for the artwork the pipeline extracts: upload a custom
+  // poster or card image straight to the public CloudFront path.
+  const handleFileSubmit = async (file, type) => {
+    if (!file) {
+      toast({ title: `Please choose a ${type} file.` });
+      return;
+    }
+    if (!contentId) {
       toast({ title: "Generate a Movie Id first.", variant: "destructive" });
       return;
     }
 
     try {
-      // 1. Ensure the content doc exists (metadata) BEFORE uploading the movie,
-      //    so the transcode completion handler can update it.
-      await saveMetadata({
-        _id: id,
-        title: formData.get("title"),
-        description: formData.get("description"),
-        type: formData.get("type"),
-        releaseDate: formData.get("date"),
-        genres: selected,
-        tags: tag,
-        isPublish: formData.get("isPublish") === "on",
-        deleted: formData.get("isDeleted") === "on",
-      });
+      await saveMetadata({ _id: contentId, ...readForm() });
+      const { publicUrl } = await uploadAsset(contentId, file, "image", setProgress);
 
-      // 2. Upload the asset. Movie -> raw bucket (transcode); images -> public.
-      const kind = type === "movie" ? "video" : "image";
-      const { publicUrl } = await uploadAsset(id, file, kind, setProgress);
+      if (type === "thumbnail") await updateContent(contentId, { thumbnail_url: publicUrl });
+      if (type === "poster") await updateContent(contentId, { poster_url: publicUrl });
 
-      // 3. For images, save the resulting public URL on the content.
-      if (type === "thumbnail") await updateContent(id, { thumbnail_url: publicUrl });
-      if (type === "poster") await updateContent(id, { poster_url: publicUrl });
-
-      toast({
-        title: "File upload",
-        description: `${type.charAt(0).toUpperCase() + type.slice(1)} uploaded successfully!`,
-      });
+      setDetailsSaved(true);
+      toast({ title: "Upload complete", description: `${type} updated.` });
     } catch (e) {
       toast({ title: e?.response?.data?.error || e.message, variant: "destructive" });
     }
@@ -178,7 +195,7 @@ export default function DynamicForm({ initialData, isEdit = false }) {
               <div className="flex ">
                 <div className="grid w-2/4 max-w-sm items-center gap-1.5">
                   <Label htmlFor="date">Type</Label>
-                  <Select name="type" defaultValue={initialData.type}>
+                  <Select name="type" value={contentType} onValueChange={setContentType}>
                     <SelectTrigger className="w-[180px]">
                       <SelectValue placeholder="select Movie/series" />
                     </SelectTrigger>
@@ -222,24 +239,7 @@ export default function DynamicForm({ initialData, isEdit = false }) {
                 />
               </div>
 
-              {/* File Inputs */}
-              <div className="grid w-full max-w-sm items-center gap-1.5">
-                <Label htmlFor="movie">Movie</Label>
-                <div className="flex gap-1.5">
-                  <Input
-                    id="movie"
-                    type="file"
-                    name="movie"
-                    onChange={(e) => setMovieFile(e.target.files?.[0] || null)}
-                  />
-                  <Button
-                    type="button"
-                    onClick={(e) => handleFileSubmit(movieFile, "movie")}
-                  >
-                    Upload Movie
-                  </Button>
-                </div>
-              </div>
+              {/* Optional artwork overrides — the pipeline also extracts stills. */}
               <div className="grid w-full max-w-sm items-center gap-1.5">
                 <Label htmlFor="thumbnail">Thumbnail</Label>
                 <div className="flex gap-1.5">
@@ -300,8 +300,27 @@ export default function DynamicForm({ initialData, isEdit = false }) {
               </div>
 
               <ProgressBar progress={progress} />
-              {isEdit ? <Button type="submit">update</Button> : <></>}
+              <div className="flex gap-2">
+                <Button type="button" variant="secondary" onClick={handleSaveDetails}>
+                  Save details
+                </Button>
+                {isEdit ? <Button type="submit">update</Button> : <></>}
+              </div>
             </form>
+          </div>
+
+          <div className="w-[28rem]">
+            <h2 className="mb-1 text-lg font-semibold">Media pipeline</h2>
+            <p className="mb-6 text-xs text-muted-foreground">
+              Runs on this machine. Nothing reaches S3 until you publish.
+            </p>
+            {detailsSaved ? (
+              <IngestPanel contentId={contentId} contentType={contentType} />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Save the details first to enable the media pipeline.
+              </p>
+            )}
           </div>
         </div>
       </div>

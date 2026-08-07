@@ -1,41 +1,51 @@
 "use client";
 
-// Minimal auth client. Tokens are minted by the admin API and stored locally.
-const ADMIN_API =
-  process.env.NEXT_PUBLIC_ADMIN_API_URL || process.env.NEXT_PUBLIC_API_URL?.replace("/api/v1", "/api/v1/admin");
+/**
+ * Viewer accounts. These live in the Go Lambda, not the admin API — the admin
+ * API only runs on the operator's own machine and is unreachable from here.
+ */
+
+const API = process.env.NEXT_PUBLIC_API_URL;
 
 const TOKEN_KEY = "cf_token";
 const USER_KEY = "cf_user";
 
-export function getToken() {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
-}
+export const getToken = () =>
+  typeof window === "undefined" ? null : localStorage.getItem(TOKEN_KEY);
 
-export function getUser() {
+export const getStoredUser = () => {
   if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem(USER_KEY);
-  return raw ? JSON.parse(raw) : null;
-}
+  try {
+    return JSON.parse(localStorage.getItem(USER_KEY) || "null");
+  } catch {
+    return null;
+  }
+};
 
-export function logout() {
+export const logout = () => {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
-}
+};
 
-async function authRequest(path, body) {
-  if (!ADMIN_API) throw new Error("Auth API not configured (set NEXT_PUBLIC_ADMIN_API_URL)");
-  const res = await fetch(`${ADMIN_API}${path}`, {
+const authenticate = async (path, body) => {
+  if (!API) throw new Error("Sign-in is unavailable — NEXT_PUBLIC_API_URL is not set.");
+
+  const res = await fetch(`${API}${path}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || "Request failed");
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || "Something went wrong. Try again.");
+
   localStorage.setItem(TOKEN_KEY, json.token);
   localStorage.setItem(USER_KEY, JSON.stringify(json.user));
-  return json;
-}
+  return json.user;
+};
 
-export const login = (email, password) => authRequest("/auth/login", { email, password });
-export const signup = (name, email, password) => authRequest("/auth/signup", { name, email, password });
+/** `identity` is a username or an email — the API accepts either. */
+export const login = (identity, password) =>
+  authenticate("/auth/login", { email: identity, password });
+
+export const signup = (username, email, password) =>
+  authenticate("/auth/signup", { username, email, password });

@@ -3,13 +3,23 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 require('dotenv').config();
 
+const { MEDIA_ROOT } = require('./ingest/jobs');
+
 const app = express();
 
 app.use(cors());
+// Only JSON bodies are parsed; uploaded video arrives as a raw stream on the
+// ingest route and must reach it unbuffered.
 app.use(bodyParser.json({ limit: '5mb' }));
 
 // Health check
 app.get('/api/v1/admin/health', (_req, res) => res.json({ status: 'ok' }));
+
+// Extracted stills, served straight off disk so the admin UI can show them for
+// selection before anything is uploaded to S3. Local pipeline only.
+if (!process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  app.use('/media', express.static(MEDIA_ROOT));
+}
 
 // Routes
 const authRoutes = require('./routes/authRoutes');
@@ -17,11 +27,13 @@ const contentRoutes = require('./routes/contentRoutes');
 const commentRoutes = require('./routes/commentRoutes');
 const preferenceRoutes = require('./routes/preferenceRoutes');
 const s3UploadsRoutes = require('./routes/s3UploadsRotes');
+const ingestRoutes = require('./routes/ingestRoutes');
 
 app.use('/api/v1/admin', authRoutes);
 app.use('/api/v1/admin', contentRoutes);
 app.use('/api/v1/admin', commentRoutes);
 app.use('/api/v1/admin', preferenceRoutes);
 app.use('/api/v1/admin', s3UploadsRoutes);
+app.use('/api/v1/admin', ingestRoutes);
 
 module.exports = app;

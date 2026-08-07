@@ -1,85 +1,137 @@
-import ffmpeg from "fluent-ffmpeg";
-import ffmpegStatic from "ffmpeg-static";
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-
-// Prefer a system ffmpeg (may have NVENC); fall back to the bundled static binary (CPU only).
-const FFMPEG_PATH = process.env.FFMPEG_PATH || ffmpegStatic;
-ffmpeg.setFfmpegPath(FFMPEG_PATH);
-
-const RENDITIONS = [
-  { name: "480p", width: 854, height: 480, vbitrate: "1400k", abitrate: "128k" },
-  { name: "720p", width: 1280, height: 720, vbitrate: "2800k", abitrate: "128k" },
-  { name: "1080p", width: 1920, height: 1080, vbitrate: "5000k", abitrate: "192k" },
-];
-
-/** Detect NVENC once. USE_GPU=0 forces CPU; USE_GPU=1 forces GPU. */
-let _gpu;
-const hasGpu = () => {
-  if (_gpu !== undefined) return _gpu;
-  if (process.env.USE_GPU === "0") return (_gpu = false);
-  if (process.env.USE_GPU === "1") return (_gpu = true);
-  try {
-    const out = execFileSync(FFMPEG_PATH, ["-hide_banner", "-encoders"], { encoding: "utf8" });
-    _gpu = out.includes("h264_nvenc");
-  } catch {
-    _gpu = false;
-  }
-  console.log(`Transcode encoder: ${_gpu ? "h264_nvenc (GPU)" : "libx264 (CPU)"}`);
-  return _gpu;
-};
-
-const videoOpts = (r) =>
-  hasGpu()
-    ? [`-c:v h264_nvenc`, `-preset p5`, `-b:v ${r.vbitrate}`]
-    : [`-c:v libx264`, `-preset veryfast`, `-b:v ${r.vbitrate}`];
-
-const transcodeRendition = (input, outDir, r) =>
-  new Promise((resolve, reject) => {
-    const dir = path.join(outDir, r.name);
-    fs.mkdirSync(dir, { recursive: true });
-    const playlist = path.join(dir, `${r.name}.m3u8`);
-
-    ffmpeg(input)
-      .outputOptions([
-        ...videoOpts(r),
-        `-vf scale=${r.width}:${r.height}`,
-        `-c:a aac`,
-        `-b:a ${r.abitrate}`,
-        `-f hls`,
-        `-hls_time 6`,
-        `-hls_playlist_type vod`,
-        `-hls_segment_filename ${path.join(dir, `${r.name}_%03d.ts`)}`,
-      ])
-      .output(playlist)
-      .on("end", () => resolve(r))
-      .on("error", reject)
-      .run();
-  });
+import { hasGpu, runFfmpeg } from "../lib/ffmpeg.js";
 
 /**
- * Transcode an input file into a multi-bitrate HLS ladder under outDir,
- * writing a master.m3u8. Returns the master playlist path.
+ * Rendition ladder, lowest first. `height` drives the scale filter; width is
+ * derived from the source aspect ratio so nothing is letterboxed or stretched.
  */
-export const transcodeToHLS = async (input, outDir) => {
+export const LADDER = [
+  { name: "480p", height: 480, vBitrateK: 1400, aBitrateK: 128 },
+  { name: "720p", height: 720, vBitrateK: 2800, aBitrateK: 128 },
+  { name: "1080p", height: 1080, vBitrateK: 5000, aBitrateK: 192 },
+];
+
+/** Target segment length. Keyframes land every GOP_SECONDS, which divides this. */
+const SEGMENT_SECONDS = 10;
+const GOP_SECONDS = 2;
+
+/**
+ * ffmpeg copies its output path separators verbatim into the playlists it
+ * writes, so a Windows `path.join` would emit `v0\playlist.m3u8` as a URI and
+ * every player would fail to resolve it. HLS URIs are always forward-slashed,
+ * and ffmpeg accepts forward slashes on Windows.
+ */
+export const ffmpegPath = (...parts) => path.join(...parts).replace(/\\/g, "/");
+
+/**
+ * Never upscale: a 720p source gets 480p + 720p, not a fake 1080p that costs
+ * bitrate and adds no detail. The lowest rung always survives so even a tiny
+ * source still produces a valid ladder.
+ */
+export const ladderFor = (sourceHeight) => {
+  const fits = LADDER.filter((r) => r.height <= sourceHeight);
+  return fits.length ? fits : [LADDER[0]];
+};
+
+const videoCodecArgs = (index, rendition, gop) => {
+  const codec = hasGpu()
+    ? [`-c:v:${index}`, "h264_nvenc", `-preset:v:${index}`, "p5"]
+    : [`-c:v:${index}`, "libx264", `-preset:v:${index}`, "veryfast"];
+  return [
+    ...codec,
+    `-b:v:${index}`,
+    `${rendition.vBitrateK}k`,
+    // Cap the peak so a busy scene cannot blow past the rung it was picked for.
+    `-maxrate:v:${index}`,
+    `${Math.round(rendition.vBitrateK * 1.07)}k`,
+    `-bufsize:v:${index}`,
+    `${rendition.vBitrateK * 2}k`,
+    // Fixed GOP with scene-cut detection off: every rendition then cuts at the
+    // same timestamps, which is what lets a player switch rungs mid-stream.
+    `-g:v:${index}`,
+    String(gop),
+    `-keyint_min:v:${index}`,
+    String(gop),
+    `-sc_threshold:v:${index}`,
+    "0",
+  ];
+};
+
+/**
+ * Transcode `input` into a multi-bitrate HLS ladder under `outDir` in a single
+ * ffmpeg pass, writing master.m3u8 alongside one directory per rendition.
+ *
+ * One pass decodes the source once instead of once per rung, and lets ffmpeg
+ * author the master playlist (correct BANDWIDTH, RESOLUTION and CODECS tags)
+ * rather than hand-assembling it.
+ *
+ * @param {string} input
+ * @param {string} outDir
+ * @param {object} source                 result of probe()
+ * @param {(p: {percent: number|null}) => void} [onProgress]
+ * @returns {Promise<{master: string, renditions: string[], segmentSeconds: number}>}
+ */
+export const transcodeToHLS = async (input, outDir, source, onProgress) => {
+  const renditions = ladderFor(source.height);
+  const gop = Math.max(1, Math.round(source.fps * GOP_SECONDS));
   fs.mkdirSync(outDir, { recursive: true });
 
-  for (const r of RENDITIONS) {
-    console.log(`Transcoding ${r.name}...`);
-    await transcodeRendition(input, outDir, r);
-  }
+  const split = `[0:v]split=${renditions.length}${renditions.map((_, i) => `[v${i}]`).join("")}`;
+  const scales = renditions.map((r, i) => `[v${i}]scale=-2:${r.height}[v${i}out]`);
 
-  const master =
-    "#EXTM3U\n" +
-    RENDITIONS.map(
-      (r) =>
-        `#EXT-X-STREAM-INF:BANDWIDTH=${parseInt(r.vbitrate) * 1000},RESOLUTION=${r.width}x${r.height}\n${r.name}/${r.name}.m3u8`
-    ).join("\n") +
-    "\n";
+  const maps = [];
+  const codecs = [];
+  renditions.forEach((rendition, i) => {
+    maps.push("-map", `[v${i}out]`);
+    codecs.push(...videoCodecArgs(i, rendition, gop));
+    if (source.hasAudio) {
+      maps.push("-map", "a:0");
+      codecs.push(`-c:a:${i}`, "aac", `-b:a:${i}`, `${rendition.aBitrateK}k`, `-ac:a:${i}`, "2");
+    }
+  });
 
-  const masterPath = path.join(outDir, "master.m3u8");
-  fs.writeFileSync(masterPath, master);
-  console.log("Wrote master.m3u8");
-  return masterPath;
+  const streamMap = renditions
+    .map((_, i) => (source.hasAudio ? `v:${i},a:${i}` : `v:${i}`))
+    .join(" ");
+
+  await runFfmpeg(
+    [
+      "-i",
+      input,
+      "-filter_complex",
+      [split, ...scales].join(";"),
+      ...maps,
+      ...codecs,
+      "-f",
+      "hls",
+      "-hls_time",
+      String(SEGMENT_SECONDS),
+      "-hls_playlist_type",
+      "vod",
+      // Tells the player each segment can be decoded on its own, which is what
+      // makes mid-stream rung switching seamless.
+      "-hls_flags",
+      "independent_segments",
+      "-hls_segment_type",
+      "mpegts",
+      "-hls_segment_filename",
+      ffmpegPath(outDir, "v%v", "seg_%03d.ts"),
+      "-master_pl_name",
+      "master.m3u8",
+      "-var_stream_map",
+      streamMap,
+      ffmpegPath(outDir, "v%v", "playlist.m3u8"),
+    ],
+    {
+      durationSec: source.durationSec,
+      onProgress: onProgress && ((p) => onProgress({ percent: p.percent })),
+    }
+  );
+
+  return {
+    master: path.join(outDir, "master.m3u8"),
+    renditions: renditions.map((r) => r.name),
+    segmentSeconds: SEGMENT_SECONDS,
+  };
 };

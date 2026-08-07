@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"user-backend/internal/config"
+	"user-backend/internal/controllers"
 	"user-backend/internal/routes"
 
 	"github.com/gofiber/fiber/v2"
@@ -25,6 +26,10 @@ func main() {
 
 	// Initialize MongoDB connection
 	config.ConnectDB()
+
+	if err := controllers.EnsureUserIndexes(context.Background()); err != nil {
+		log.Printf("Could not ensure user indexes: %v", err)
+	}
 
 	// Set up routes
 	routes.SetupRoutes(app)

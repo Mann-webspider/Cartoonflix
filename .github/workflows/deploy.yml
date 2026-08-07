@@ -49,7 +49,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
       - uses: actions/setup-go@v5
-        with: { go-version: "1.22" }
+        with: { go-version: "1.25" }
 
       - name: Package admin API (Node)
         run: cd admin-backend && npm ci --omit=dev && npm run package

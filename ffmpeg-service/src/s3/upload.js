@@ -4,9 +4,11 @@ import pLimit from "p-limit";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { s3 } from "../lib/s3.js";
 
-const contentTypeFor = (file) =>
+export const contentTypeFor = (file) =>
   file.endsWith(".m3u8") ? "application/x-mpegURL"
   : file.endsWith(".ts") ? "video/mp2t"
+  : file.endsWith(".jpg") || file.endsWith(".jpeg") ? "image/jpeg"
+  : file.endsWith(".png") ? "image/png"
   : "application/octet-stream";
 
 /**

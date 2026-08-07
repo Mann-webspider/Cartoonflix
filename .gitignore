@@ -27,6 +27,10 @@ ffmpeg-service/temp
 !*.tfvars.example
 crash.log
 
+# local ingest working directory — sources, HLS output and extracted stills
+media/
+**/.tmp-media*
+
 # large / sample media — keep out of the repo (test inputs, copyrighted samples)
 ffmpeg-service/src/ffmpeg/input/
 user-frontend/public/songs/
