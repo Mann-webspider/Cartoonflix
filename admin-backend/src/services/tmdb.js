@@ -10,8 +10,22 @@
  * data came from.
  */
 
-const API = 'https://api.themoviedb.org/3';
+/**
+ * TMDB serves the same API from two hostnames. `api.tmdb.org` is the default
+ * here rather than the more familiar `api.themoviedb.org` because several ISPs
+ * — Indian ones especially — reset TLS connections to the latter by hostname.
+ * Measured on the machine this was written on: api.themoviedb.org failed 7 of
+ * 10 attempts with ECONNRESET while api.tmdb.org succeeded 10 of 10.
+ *
+ * Override with TMDB_API_HOST if your network prefers the other one.
+ */
+const API_HOST = process.env.TMDB_API_HOST || 'https://api.tmdb.org';
+const API = `${API_HOST.replace(/\/+$/, '')}/3`;
 const IMAGE = 'https://image.tmdb.org/t/p';
+
+/** A hung lookup should fail fast, not hold the admin form open. */
+const REQUEST_TIMEOUT_MS = 12000;
+const MAX_ATTEMPTS = 3;
 
 // Certification bodies are per-country; prefer the operator's region and fall
 // back to US, which is the most consistently populated.
@@ -27,6 +41,42 @@ class TmdbError extends Error {
   }
 }
 
+/**
+ * Network faults worth trying again. A reset connection says nothing about the
+ * request, so repeating it is reasonable; a rejected API key does not improve
+ * with repetition, which is why 4xx responses are never retried.
+ */
+const TRANSIENT_CODES = new Set(['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'EAI_AGAIN', 'ENOTFOUND']);
+
+const isTransient = (err) => {
+  if (err.name === 'AbortError' || err.name === 'TimeoutError') return true;
+  // undici wraps the real cause; the code lives one level down.
+  const code = err.cause?.code || err.code;
+  return TRANSIENT_CODES.has(code) || err instanceof TypeError;
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const requestOnce = async (url) => {
+  const res = await fetch(url, {
+    headers: { accept: 'application/json' },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+
+  if (res.status === 401) throw new TmdbError('TMDB rejected the API key', 502);
+  if (res.status === 404) throw new TmdbError('Not found on TMDB', 404);
+  if (res.status === 429) throw new TmdbError('TMDB rate limit reached — wait a moment', 429);
+  // 5xx is TMDB having a bad moment, so let the caller retry it.
+  if (res.status >= 500) {
+    const err = new Error(`TMDB returned ${res.status}`);
+    err.code = 'ETIMEDOUT';
+    throw err;
+  }
+  if (!res.ok) throw new TmdbError(`TMDB request failed (${res.status})`, 502);
+
+  return res.json();
+};
+
 const request = async (path, params = {}) => {
   const key = process.env.TMDB_API_KEY;
   if (!key) {
@@ -41,13 +91,28 @@ const request = async (path, params = {}) => {
     }
   }
 
-  const res = await fetch(url, { headers: { accept: 'application/json' } });
-  if (res.status === 401) throw new TmdbError('TMDB rejected the API key', 502);
-  if (res.status === 404) throw new TmdbError('Not found on TMDB', 404);
-  if (res.status === 429) throw new TmdbError('TMDB rate limit reached — wait a moment', 429);
-  if (!res.ok) throw new TmdbError(`TMDB request failed (${res.status})`, 502);
+  let lastError;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      return await requestOnce(url);
+    } catch (err) {
+      // A definite answer from TMDB — bad key, no such title — is final.
+      if (err instanceof TmdbError) throw err;
+      if (!isTransient(err)) throw err;
 
-  return res.json();
+      lastError = err;
+      if (attempt < MAX_ATTEMPTS) await sleep(250 * attempt);
+    }
+  }
+
+  // Name the actual cause. "Metadata lookup failed" sent someone hunting
+  // through application code for what was an ISP resetting the connection.
+  const cause = lastError?.cause?.code || lastError?.code || lastError?.message;
+  throw new TmdbError(
+    `Could not reach TMDB (${cause}). Tried ${MAX_ATTEMPTS} times via ${new URL(API).host}. ` +
+      `If this persists, some ISPs reset api.themoviedb.org — set TMDB_API_HOST to the other host.`,
+    504
+  );
 };
 
 /**

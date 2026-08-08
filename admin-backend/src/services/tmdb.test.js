@@ -113,3 +113,70 @@ test("a missing API key fails loudly rather than silently returning nothing", as
   delete process.env.TMDB_API_KEY;
   await assert.rejects(() => tmdb.search("anything"), /TMDB_API_KEY is not set/);
 });
+
+const withFetchSequence = async (responses, run) => {
+  const realFetch = globalThis.fetch;
+  let call = 0;
+  globalThis.fetch = async () => {
+    const next = responses[Math.min(call++, responses.length - 1)];
+    if (typeof next === "function") return next();
+    return next;
+  };
+  try {
+    return await run(() => call);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+};
+
+const reset = () => {
+  // Shape undici uses: a TypeError whose cause carries the socket error code.
+  const err = new TypeError("fetch failed");
+  err.cause = Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" });
+  throw err;
+};
+
+const ok = (payload) => ({ ok: true, status: 200, json: async () => payload });
+
+test("a reset connection is retried rather than surfaced", async () => {
+  process.env.TMDB_API_KEY = "test-key";
+
+  const calls = await withFetchSequence([reset, reset, () => ok({ id: 1, title: "Made it" })], async (count) => {
+    const result = await tmdb.details("movie", 1);
+    assert.equal(result.title, "Made it");
+    return count();
+  });
+
+  assert.equal(calls, 3, "should have retried twice before succeeding");
+});
+
+test("exhausting the retries names the cause instead of a generic failure", async () => {
+  process.env.TMDB_API_KEY = "test-key";
+
+  await withFetchSequence([reset], async () => {
+    await assert.rejects(
+      () => tmdb.details("movie", 1),
+      (err) => {
+        // The message a bare "Metadata lookup failed" used to hide.
+        assert.match(err.message, /ECONNRESET/);
+        assert.match(err.message, /TMDB_API_HOST/);
+        assert.equal(err.status, 504);
+        return true;
+      }
+    );
+  });
+});
+
+test("a rejected API key is final and is not retried", async () => {
+  process.env.TMDB_API_KEY = "wrong-key";
+
+  const calls = await withFetchSequence(
+    [{ ok: false, status: 401, json: async () => ({}) }],
+    async (count) => {
+      await assert.rejects(() => tmdb.details("movie", 1), /rejected the API key/);
+      return count();
+    }
+  );
+
+  assert.equal(calls, 1, "a bad key does not improve with repetition");
+});
