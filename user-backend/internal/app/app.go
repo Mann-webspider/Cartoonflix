@@ -10,8 +10,11 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
-// Local dev ports. Production origins come from ALLOWED_ORIGINS.
-const defaultOrigins = "http://localhost:3000,http://localhost:3001,http://localhost:3002"
+// Permissive by default so a fresh deploy answers any origin and nobody has to
+// debug CORS before the app has ever worked once. Set ALLOWED_ORIGINS to the
+// real site origin in production — with "*" the browser will also refuse to
+// send credentialed requests, so this is a starting point, not a destination.
+const defaultOrigins = "*"
 
 // AllowedOrigins reads the browser origins permitted to call this API.
 //

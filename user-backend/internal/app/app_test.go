@@ -6,13 +6,17 @@ import (
 	"testing"
 )
 
-func TestAllowedOriginsFallsBackToLocalDevPorts(t *testing.T) {
+// The default is deliberately permissive so a fresh deploy answers before
+// anyone has configured anything. What must never happen again is an empty or
+// single-hardcoded-origin default, which is what caused the outage below.
+func TestAllowedOriginsHasAWorkingDefault(t *testing.T) {
 	t.Setenv("ALLOWED_ORIGINS", "")
 	got := AllowedOrigins()
-	for _, want := range []string{"http://localhost:3000", "http://localhost:3002"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("default origins %q missing %q", got, want)
-		}
+	if strings.TrimSpace(got) == "" {
+		t.Fatal("default origins is empty; every browser response would be blocked")
+	}
+	if strings.HasPrefix(got, "http://localhost") && !strings.Contains(got, ",") {
+		t.Errorf("default origins %q is a single hardcoded host — the exact shape that broke sign-in", got)
 	}
 }
 
