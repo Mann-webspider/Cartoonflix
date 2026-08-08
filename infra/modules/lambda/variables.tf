@@ -29,3 +29,9 @@ variable "jwt_secret_arn" { type = string }
 variable "cloudfront_domain" { type = string }
 variable "cf_key_group_id" { type = string }
 variable "cf_public_key_id" { type = string }
+
+# Browser origins allowed to call the viewer API, comma separated.
+variable "allowed_origins" {
+  type    = string
+  default = "*"
+}

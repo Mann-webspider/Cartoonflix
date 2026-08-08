@@ -232,6 +232,9 @@ resource "aws_lambda_function" "user_api" {
       JWT_SECRET_ARN        = var.jwt_secret_arn
       CLOUDFRONT_KEYPAIR_ID = var.cf_public_key_id
       CLOUDFRONT_DOMAIN     = var.cloudfront_domain
+      # Without the viewer app's origin here, the browser blocks every response
+      # and the app reports failures the API never returned.
+      ALLOWED_ORIGINS = var.allowed_origins
     }
   }
 }

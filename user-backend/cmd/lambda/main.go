@@ -4,14 +4,13 @@ import (
 	"context"
 	"log"
 
+	"user-backend/internal/app"
 	"user-backend/internal/config"
 	"user-backend/internal/controllers"
-	"user-backend/internal/routes"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	fiberadapter "github.com/awslabs/aws-lambda-go-api-proxy/fiber"
-	"github.com/gofiber/fiber/v2"
 )
 
 var fiberLambda *fiberadapter.FiberLambda
@@ -31,9 +30,9 @@ func init() {
 		log.Printf("Could not ensure social indexes: %v", err)
 	}
 
-	app := fiber.New()
-	routes.SetupRoutes(app)
-	fiberLambda = fiberadapter.New(app)
+	// Shared with the local server, so this entrypoint cannot drift out of sync
+	// on middleware again — it previously shipped with no CORS at all.
+	fiberLambda = fiberadapter.New(app.New())
 }
 
 // API Gateway HTTP API (payload format 2.0).

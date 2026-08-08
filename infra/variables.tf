@@ -64,3 +64,11 @@ variable "completion_lambda_zip" {
   type    = string
   default = "../ffmpeg-service/dist/completion.zip"
 }
+
+# Origins allowed to call the viewer API and fetch media from CloudFront.
+# Comma separated for the API; the CloudFront module takes the list form.
+variable "allowed_origins" {
+  description = "Viewer app origins, e.g. https://cartoonflix.vercel.app"
+  type        = list(string)
+  default     = ["*"]
+}

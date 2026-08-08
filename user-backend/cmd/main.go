@@ -4,11 +4,10 @@ import (
 	"context"
 	"log"
 	"os"
+	"user-backend/internal/app"
 	"user-backend/internal/config"
 	"user-backend/internal/controllers"
-	"user-backend/internal/routes"
 
-	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
 )
 
@@ -20,11 +19,6 @@ func main() {
 
 	// Pull secrets into env when running against AWS.
 	config.LoadSecrets(context.Background())
-
-	// Initialize Fiber app
-	app := fiber.New()
-
-	// Initialize MongoDB connection
 	config.ConnectDB()
 
 	if err := controllers.EnsureUserIndexes(context.Background()); err != nil {
@@ -34,15 +28,11 @@ func main() {
 		log.Printf("Could not ensure social indexes: %v", err)
 	}
 
-	// Set up routes
-	routes.SetupRoutes(app)
-
-	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	log.Printf("User Backend running on port %s", port)
-	log.Fatal(app.Listen(":" + port))
+	log.Printf("User Backend running on port %s (origins: %s)", port, app.AllowedOrigins())
+	log.Fatal(app.New().Listen(":" + port))
 }

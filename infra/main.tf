@@ -91,6 +91,7 @@ module "cloudfront" {
   hls_bucket_arn         = module.s3.hls_bucket_arn
   hls_bucket_domain_name = module.s3.hls_bucket_regional_domain_name
   public_key_pem         = var.cloudfront_public_key_pem
+  allowed_origins        = var.allowed_origins
 }
 
 module "ecs" {
@@ -138,6 +139,7 @@ module "lambda" {
   cloudfront_domain = module.cloudfront.distribution_domain
   cf_key_group_id   = module.cloudfront.key_group_id
   cf_public_key_id  = module.cloudfront.public_key_id
+  allowed_origins   = join(",", var.allowed_origins)
 }
 
 module "observability" {
