@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars and fill in. NEVER commit the real file.
+
+mongo_uri  = "mongodb+srv://USER:PASS@CLUSTER.mongodb.net/"
+jwt_secret = "replace-with-a-long-random-string"
+
+# Add the viewer app's origin once it has one. Leaving "*" works, but browsers
+# will not send credentialed requests to a wildcard.
+allowed_origins = ["*"]
+
+# aws_region    = "ap-south-1"
+# function_name = "cartoonflix-user-api"
+# architecture  = "x86_64"
