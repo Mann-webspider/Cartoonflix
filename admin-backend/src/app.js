@@ -28,6 +28,7 @@ const commentRoutes = require('./routes/commentRoutes');
 const preferenceRoutes = require('./routes/preferenceRoutes');
 const s3UploadsRoutes = require('./routes/s3UploadsRotes');
 const ingestRoutes = require('./routes/ingestRoutes');
+const tmdbRoutes = require('./routes/tmdbRoutes');
 
 app.use('/api/v1/admin', authRoutes);
 app.use('/api/v1/admin', contentRoutes);
@@ -35,5 +36,6 @@ app.use('/api/v1/admin', commentRoutes);
 app.use('/api/v1/admin', preferenceRoutes);
 app.use('/api/v1/admin', s3UploadsRoutes);
 app.use('/api/v1/admin', ingestRoutes);
+app.use('/api/v1/admin', tmdbRoutes);
 
 module.exports = app;
