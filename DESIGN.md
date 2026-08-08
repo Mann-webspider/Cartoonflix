@@ -74,9 +74,10 @@ same tint is 7.4:1.
 exactly this.
 
 **4. `--ember` answers one question: how far through something are you.** It
-appears on the continue-watching progress bar and the player's played track.
-The volume slider deliberately does *not* use it — that is why
-`.scrubber--volume` overrides the track to `--text`.
+appears on exactly two things — the continue-watching progress bar and the
+player's played track (`--media-range-bar-color`). The volume slider
+deliberately does *not* use it; giving amber a second meaning costs it the
+first one.
 
 **5. Brand must own a region on every state of the home page.** Signed out, that
 is the sign-in panel. Signed in, it is the full-bleed `bg-brand-deep` band
@@ -144,16 +145,14 @@ nothing.
 
 - Card hover — artwork `scale-[1.04]` over 500ms, ring lightens, play affordance
   fades in.
-- Player control bar — fades out after 2800ms idle *while playing only*; paused
-  means the viewer is deciding something, so the bar stays up.
+- Player control bar — auto-hide is Media Chrome's own, left at its default.
 - Skeletons breathe on a `skeleton` keyframe (opacity 1 → 0.45), not Tailwind's
   stock pulse.
 - `prefers-reduced-motion` collapses every animation and transition to 0.01ms.
 
-**Never animate a layout property.** Width, height, padding and margin inside
-the header row or the player control bar reflow the whole bar. This is why the
-header search field is a fixed width and the volume slider is `hidden sm:block`
-rather than expand-on-hover.
+**Never animate a layout property.** Width, height, padding and margin inside a
+flex row reflow the whole row. This is why the header search field is a fixed
+width rather than expanding on focus.
 
 ---
 
@@ -193,26 +192,40 @@ Everything in `src/components/`. Nothing here comes from a component library.
 
 ### The player
 
-The watch page is the reason the product exists, so it does not ship the
-browser's default control bar.
+Built on **Media Chrome** plus **hls-video-element**, not hand-rolled and not
+the browser default.
 
-- The scrubber is a real `<input type="range">`, restyled. That buys keyboard
-  stepping and screen-reader announcement for free, and both are easy to get
-  wrong when rebuilt from divs. `aria-valuetext` reads as a clock
-  ("11:19 of 1:19:16"), not a float.
-- Track is a gradient: `--ember` played, `--text/0.3` buffered, `--text/0.12`
-  remainder. It grows 4px → 6px on hover or focus; the thumb stays hidden until
-  the viewer reaches for it.
-- Keyboard: space/`k` play-pause, arrows ±10s, `f` fullscreen, `m` mute. Arrows
-  are deferred to the scrubber when it holds focus.
-- `waiting` starts **false**. `autoPlay` without `muted` is blocked by default
-  in Chrome and Safari, so `playing` may never fire; starting true spins a
-  loader forever over a paused first frame.
-- Fullscreen targets the shell, not the `<video>`, so the authored controls come
-  with it.
-- Progress writes to `localStorage` every tick and to the API at most every 15
-  seconds. `timeupdate` fires about four times a second; a request per tick
-  would exhaust the database's free tier in an afternoon.
+The library supplies the control bar, the captions and quality menus,
+picture-in-picture and fullscreen — a large surface that is easy to build badly,
+and a half-finished captions menu is worse than none. `hls-video-element` wraps
+hls.js and is what exposes the HLS renditions and text tracks to those menus.
+Both are plain custom elements, so they take the tokens above directly rather
+than arriving with a theme to fight.
+
+Vidstack was tried first and rejected: its `latest` dist-tag still points at
+0.6.15 (React 18 only), and the current 1.15.6 line under the `next` tag never
+resolves a provider on React 19 — reproduced with its own demo stream and no
+custom wiring.
+
+Theming lives on `.cf-player` in `globals.css`:
+
+- `--media-range-bar-color` is `--ember`. Amber keeps its single meaning here:
+  played progress. Buffered and remainder are tints of `--text`.
+- The control bar sits on an ink gradient, because it overlays moving artwork.
+- Menus use `--surface` with the standard hairline and radius; the chosen
+  quality and caption track are tinted `--brand-bright` so they read as chosen
+  rather than decorative.
+
+What the app still owns, because it is specific to this product:
+
+- **Resume.** Position is written to `localStorage` every tick and to the API at
+  most every 15 seconds — `timeupdate` fires about four times a second, and a
+  request per tick would exhaust the database's free tier in an afternoon.
+  localStorage covers a signed-out viewer on one device; the API covers a
+  signed-in one anywhere.
+- Playback never resumes within 15 seconds of the end; that just replays the
+  credits.
+- Skip buttons are ±10 seconds.
 
 ---
 

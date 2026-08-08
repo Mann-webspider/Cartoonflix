@@ -47,9 +47,10 @@ One command, or one screen in the admin app, takes a source file to a published 
 |---|---|---|
 | **Probe** | `ffprobe` reads duration, dimensions, frame rate, audio presence | local |
 | **Transcode** | One ffmpeg pass emits 480p/720p/1080p with a fixed 2s GOP and ~10s segments, plus the master playlist | local |
+| **Subtitles** | Text tracks in the source are converted to WebVTT; sidecar .srt/.vtt files can be added | local |
 | **Stills** | Ten frames sampled across the middle 90% of the runtime | local |
 | **Review** | The operator picks a poster and a card image from the stills | local |
-| **Publish** | HLS tree and chosen stills go to S3; the location is written to MongoDB | the only cloud write |
+| **Publish** | HLS tree, subtitle tracks and chosen stills go to S3; the location is written to MongoDB | the only cloud write |
 
 A few details that matter:
 
@@ -57,6 +58,7 @@ A few details that matter:
 - **Keyframes are aligned.** Fixed GOP with scene-cut detection off means every rendition cuts at the same timestamps, which is what lets a player switch quality mid-stream without a stall.
 - **No upscaling.** A 720p source produces 480p and 720p — not a fake 1080p that costs bitrate and adds nothing.
 - **Series are first-class.** A movie is keyed by its content id; an episode by `<contentId>/s<N>e<N>`. The same string names the local folder and the S3 prefix, so publishing is a directory copy.
+- **Bitmap subtitles are reported, not attempted.** Blu-ray PGS and DVD VOBSUB cues are images; converting them needs OCR, so they are listed as skipped with a reason rather than failing the ingest.
 
 The original event-driven cloud path (S3 event → orchestrator Lambda → SQS → Fargate) is still in `infra/` and still works. It is the fallback for machines that cannot transcode, not the default.
 
@@ -162,8 +164,11 @@ terraform init && terraform plan && terraform apply
 - [x] Phase 3 — serverless API (admin + user Lambdas) + on-demand transcode pipeline
 - [x] Phase 4 — JWT auth, search, observability, admin dashboard, viewer app
 - [x] Phase 5 — local-first ingest: single-pass keyframe-aligned HLS ladder, still extraction and poster selection, series/episode support, publish-to-S3 as an explicit step; viewer accounts and continue-watching moved into the Go Lambda; viewer app rebuilt
+- [x] Phase 6 — TMDB metadata enrichment; admin rebuilt on shadcn + react-hook-form with a real series flow and a preview pane; subtitle extraction and sidecar uploads; Media Chrome player with captions, quality, PiP and 10s skip; likes, reviews and share
 
 ### Known limitations
 
 - HLS is served publicly through CloudFront. Signed URLs do not work for HLS — the player fetches every segment separately and only the master playlist would carry the signature. Signed *cookies* are the correct fix and need a custom domain so the Vercel app and the CloudFront distribution can share a parent-domain cookie.
 - Ingest progress lives in the admin server's memory, so restarting it mid-transcode loses the progress bar (the transcode itself continues, and the finished job is recovered from its manifest).
+- CloudFront CORS defaults to `*`. Narrow `allowed_origins` to the viewer app's origin once it has a domain.
+- Review moderation does not exist. One review per account per title is enforced, but nothing screens the text.
