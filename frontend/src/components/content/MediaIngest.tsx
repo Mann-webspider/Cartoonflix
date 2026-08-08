@@ -13,6 +13,7 @@ import {
   startIngest,
   thumbnailUrl,
   uploadSource,
+  uploadSubtitle,
   type IngestJob,
 } from "@/lib/api";
 
@@ -45,14 +46,21 @@ export default function MediaIngest({ contentId, season, episode, onPublished }:
 
   const [file, setFile] = useState<File | null>(null);
   const [uploadPercent, setUploadPercent] = useState(0);
-  const [busy, setBusy] = useState<"upload" | "publish" | null>(null);
+  const [busy, setBusy] = useState<"upload" | "publish" | "subtitle" | null>(null);
   const [job, setJob] = useState<IngestJob | null>(null);
   const [poster, setPoster] = useState<string | null>(null);
   const [thumbnail, setThumbnail] = useState<string | null>(null);
   const { toast } = useToast();
 
+  const [subtitleFile, setSubtitleFile] = useState<File | null>(null);
+  const [subtitleLanguage, setSubtitleLanguage] = useState("en");
+  const [subtitleLabel, setSubtitleLabel] = useState("");
+
   const running = job?.status === "running";
-  const stills = job?.status === "done" ? (job.manifest?.thumbnails ?? []) : [];
+  const transcoded = job?.status === "done";
+  const stills = transcoded ? (job.manifest?.thumbnails ?? []) : [];
+  const tracks = transcoded ? (job.manifest?.subtitles ?? []) : [];
+  const skippedTracks = transcoded ? (job.manifest?.skippedSubtitles ?? []) : [];
 
   const fail = useCallback(
     (err: unknown, fallback: string) =>
@@ -102,6 +110,29 @@ export default function MediaIngest({ contentId, season, episode, onPublished }:
       toast({ title: "Transcode started", description: "Progress appears below." });
     } catch (err) {
       fail(err, "Upload failed");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const addSubtitle = async () => {
+    if (!subtitleFile) return toast({ title: "Choose a subtitle file.", variant: "destructive" });
+    if (!subtitleLanguage.trim()) {
+      return toast({ title: "Enter a language code, e.g. en.", variant: "destructive" });
+    }
+
+    setBusy("subtitle");
+    try {
+      const track = await uploadSubtitle(contentId, subtitleFile, coords, {
+        language: subtitleLanguage.trim(),
+        label: subtitleLabel.trim() || undefined,
+      });
+      setSubtitleFile(null);
+      setSubtitleLabel("");
+      await refresh();
+      toast({ title: `Added ${track.label}`, description: "Publish to upload it." });
+    } catch (err) {
+      fail(err, "Could not add the subtitle track");
     } finally {
       setBusy(null);
     }
@@ -166,6 +197,85 @@ export default function MediaIngest({ contentId, season, episode, onPublished }:
         <p role="alert" className="whitespace-pre-wrap rounded-md border border-destructive/50 p-3 text-sm">
           Transcode failed: {job.error}
         </p>
+      )}
+
+      {transcoded && (
+        <div className="space-y-3 rounded-md border p-4">
+          <div>
+            <Label>Subtitles</Label>
+            <p className="text-xs text-muted-foreground">
+              Text tracks found in the source are converted automatically. Add a
+              .srt or .vtt file for sources that carry none.
+            </p>
+          </div>
+
+          {tracks.length > 0 && (
+            <ul className="flex flex-wrap gap-1.5">
+              {tracks.map((track) => (
+                <li key={track.file}>
+                  <Badge variant="secondary">
+                    {track.label}
+                    {track.source === "uploaded" ? " · uploaded" : ""}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/* Bitmap tracks are named rather than silently dropped — otherwise a
+              Blu-ray rip looks like the pipeline simply ignored its subtitles. */}
+          {skippedTracks.length > 0 && (
+            <ul className="space-y-0.5 text-xs text-muted-foreground">
+              {skippedTracks.map((track, index) => (
+                <li key={index}>
+                  Skipped {track.label}: {track.reason}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="flex flex-wrap items-end gap-2">
+            <Input
+              type="file"
+              accept=".srt,.vtt,.ass,.ssa,.sub"
+              onChange={(event) => setSubtitleFile(event.target.files?.[0] ?? null)}
+              className="max-w-[15rem]"
+              aria-label="Subtitle file"
+            />
+            <div className="space-y-1">
+              <Label htmlFor={`sub-lang-${coordsKey}`} className="text-xs">
+                Language
+              </Label>
+              <Input
+                id={`sub-lang-${coordsKey}`}
+                value={subtitleLanguage}
+                onChange={(event) => setSubtitleLanguage(event.target.value)}
+                className="w-20"
+                placeholder="en"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor={`sub-label-${coordsKey}`} className="text-xs">
+                Label (optional)
+              </Label>
+              <Input
+                id={`sub-label-${coordsKey}`}
+                value={subtitleLabel}
+                onChange={(event) => setSubtitleLabel(event.target.value)}
+                className="w-40"
+                placeholder="English"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={addSubtitle}
+              disabled={busy !== null || !subtitleFile}
+            >
+              {busy === "subtitle" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add track"}
+            </Button>
+          </div>
+        </div>
       )}
 
       {stills.length > 0 && (

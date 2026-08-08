@@ -82,6 +82,9 @@ export interface IngestJob {
   error?: string | null;
   manifest?: {
     thumbnails: string[];
+    subtitles?: { file: string; language: string; label: string; source: string }[];
+    // Bitmap tracks the pipeline could not convert, with the reason.
+    skippedSubtitles?: { codec: string; label: string; reason: string }[];
     hls: { renditions: string[]; segmentSeconds: number };
     source: { durationSec: number; width: number; height: number };
   } | null;
@@ -222,6 +225,34 @@ const safeError = (body: string) => {
   } catch {
     return null;
   }
+};
+
+/**
+ * Upload a sidecar subtitle file. Converted to WebVTT server-side and added to
+ * the job's manifest, so the next publish uploads it with everything else.
+ */
+export const uploadSubtitle = async (
+  id: string,
+  file: File,
+  coords: { season?: number; episode?: number } | undefined,
+  meta: { language: string; label?: string }
+) => {
+  const query = new URLSearchParams({ filename: file.name, language: meta.language });
+  if (meta.label) query.set("label", meta.label);
+  const extra = episodeParams(coords);
+
+  const res = await fetch(
+    `${API_BASE}/ingest/${id}/subtitle?${query}${extra ? `&${extra}` : ""}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "text/plain", ...authHeaders() },
+      body: file,
+    }
+  );
+
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(payload.error || `Subtitle upload failed (${res.status})`);
+  return payload.track as { language: string; label: string; file: string };
 };
 
 export const startIngest = (

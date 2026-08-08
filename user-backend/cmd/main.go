@@ -30,6 +30,9 @@ func main() {
 	if err := controllers.EnsureUserIndexes(context.Background()); err != nil {
 		log.Printf("Could not ensure user indexes: %v", err)
 	}
+	if err := controllers.EnsureSocialIndexes(context.Background()); err != nil {
+		log.Printf("Could not ensure social indexes: %v", err)
+	}
 
 	// Set up routes
 	routes.SetupRoutes(app)

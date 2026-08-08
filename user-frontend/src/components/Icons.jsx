@@ -101,6 +101,33 @@ export const ExitFullscreenIcon = ({ size = 20, ...rest }) => (
   </Svg>
 );
 
+export const HeartIcon = ({ size = 20, filled = false, ...rest }) => (
+  <Svg size={size} {...rest}>
+    <path
+      d="M12 19.5S4.75 15.1 4.75 10.1A3.85 3.85 0 0 1 12 8.2a3.85 3.85 0 0 1 7.25 1.9c0 5-7.25 9.4-7.25 9.4Z"
+      {...stroke}
+      fill={filled ? "currentColor" : "none"}
+    />
+  </Svg>
+);
+
+export const ShareIcon = ({ size = 20, ...rest }) => (
+  <Svg size={size} {...rest}>
+    <path d="M12 15.5V4.25M8.25 7.5 12 3.75l3.75 3.75" {...stroke} />
+    <path d="M5.75 13.5v4.75a1.5 1.5 0 0 0 1.5 1.5h9.5a1.5 1.5 0 0 0 1.5-1.5V13.5" {...stroke} />
+  </Svg>
+);
+
+export const StarIcon = ({ size = 20, filled = false, ...rest }) => (
+  <Svg size={size} {...rest}>
+    <path
+      d="m12 4.5 2.29 4.64 5.12.75-3.7 3.61.87 5.1L12 16.19l-4.58 2.41.87-5.1-3.7-3.61 5.12-.75z"
+      {...stroke}
+      fill={filled ? "currentColor" : "none"}
+    />
+  </Svg>
+);
+
 export const CloseIcon = ({ size = 20, ...rest }) => (
   <Svg size={size} {...rest}>
     <path d="m6 6 12 12M18 6 6 18" {...stroke} />

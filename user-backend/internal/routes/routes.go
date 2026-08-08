@@ -27,6 +27,14 @@ func SetupRoutes(app *fiber.App) {
 	api.Get("/search", controllers.SearchContent)
 	api.Get("/comments", controllers.GetComments)
 
+	// Social. The read endpoints work signed out and simply omit the personal
+	// half; writing requires an account.
+	api.Get("/contents/:id/social", middleware.OptionalAuth, controllers.GetSocial)
+	api.Get("/contents/:id/reviews", controllers.ListReviews)
+	api.Post("/contents/:id/like", middleware.RequireAuth, controllers.ToggleLike)
+	api.Post("/contents/:id/reviews", middleware.RequireAuth, controllers.SaveReview)
+	api.Delete("/contents/:id/reviews", middleware.RequireAuth, controllers.DeleteReview)
+
 	// Personalisation — everything here is scoped to the token's user.
 	me := api.Group("/me", middleware.RequireAuth)
 	me.Get("/continue", controllers.ContinueWatching)

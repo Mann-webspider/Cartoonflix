@@ -129,6 +129,42 @@ export async function saveProgress({ id, season, episode, position, duration }) 
   }
 }
 
+// --- Social ---
+
+/**
+ * Likes and rating summary for one title, plus this viewer's own state when
+ * they are signed in. One request rather than three, because the title page
+ * needs all of it at once.
+ */
+export async function getSocial(id) {
+  if (!API) return null;
+  try {
+    return await request(`/contents/${encodeURIComponent(id)}/social`);
+  } catch {
+    return null; // social is an enhancement; its absence must not break the page
+  }
+}
+
+export async function toggleLike(id) {
+  return request(`/contents/${encodeURIComponent(id)}/like`, { method: "POST" });
+}
+
+export async function getReviews(id) {
+  if (!API) return { data: [], average: 0, count: 0 };
+  return request(`/contents/${encodeURIComponent(id)}/reviews`);
+}
+
+export async function saveReview(id, { rating, body }) {
+  return request(`/contents/${encodeURIComponent(id)}/reviews`, {
+    method: "POST",
+    body: JSON.stringify({ rating, body }),
+  });
+}
+
+export async function deleteReview(id) {
+  return request(`/contents/${encodeURIComponent(id)}/reviews`, { method: "DELETE" });
+}
+
 const MY_LIST = "watchlist";
 
 export async function getMyList() {

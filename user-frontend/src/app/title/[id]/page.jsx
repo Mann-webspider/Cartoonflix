@@ -4,6 +4,9 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import EpisodeList from "@/components/EpisodeList";
 import MyListButton from "@/components/MyListButton";
+import LikeButton from "@/components/LikeButton";
+import ShareButton from "@/components/ShareButton";
+import Reviews from "@/components/Reviews";
 import Rail from "@/components/Rail";
 import TitleCard from "@/components/TitleCard";
 import { PlayIcon } from "@/components/Icons";
@@ -14,6 +17,7 @@ import {
   formatRuntime,
   getContent,
   getContents,
+  getSocial,
   totalEpisodes,
 } from "@/lib/api";
 
@@ -22,8 +26,13 @@ export default function TitlePage({ params }) {
   const [item, setItem] = useState(undefined);
   const [failure, setFailure] = useState(null);
   const [related, setRelated] = useState([]);
+  const [social, setSocial] = useState(null);
 
   useDocumentTitle(item?.title);
+
+  useEffect(() => {
+    getSocial(id).then(setSocial);
+  }, [id]);
 
   useEffect(() => {
     getContent(id)
@@ -137,6 +146,15 @@ export default function TitlePage({ params }) {
                 {isSeries ? "Play episode 1" : "Play"}
               </Link>
               <MyListButton id={contentId(item)} />
+              {/* Keyed on the social payload so the initial counts land once
+                  fetched, without the button owning the request. */}
+              <LikeButton
+                key={`like-${social ? "ready" : "pending"}`}
+                id={contentId(item)}
+                initialLiked={social?.liked ?? false}
+                initialCount={social?.likes ?? 0}
+              />
+              <ShareButton title={item.title} />
             </div>
 
             {item.genres?.length > 0 && (
@@ -158,6 +176,8 @@ export default function TitlePage({ params }) {
       </section>
 
       {isSeries && <EpisodeList contentId={contentId(item)} seasons={item.seasons} />}
+
+      <Reviews contentId={contentId(item)} />
 
       {related.length > 0 && (
         <Rail title="More like this">
