@@ -7,7 +7,7 @@ import { login, signup } from "@/lib/auth";
 import { useSession } from "@/components/SessionProvider";
 
 const FIELD =
-  "w-full rounded border border-line bg-surface px-4 py-3 text-[0.95rem] outline-none transition-colors duration-200 placeholder:text-dim focus:border-brand-bright";
+  "w-full rounded border border-line bg-surface px-4 py-3 text-[0.95rem] outline-none transition-colors duration-200 placeholder:text-dim focus:border-text";
 
 /**
  * Sign in and sign up share a shape, so they share a component.
@@ -117,7 +117,7 @@ export default function AuthForm({ mode }) {
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded bg-brand px-6 py-3.5 font-display text-[0.95rem] font-bold text-brand-ink transition-colors duration-200 hover:bg-brand-bright disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded bg-text px-6 py-3.5 font-display text-[0.95rem] font-bold text-contrast-ink transition-colors duration-200 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy ? "One moment…" : isSignup ? "Create account" : "Sign in"}
           </button>
@@ -127,7 +127,7 @@ export default function AuthForm({ mode }) {
           {isSignup ? "Already have an account? " : "New here? "}
           <Link
             href={isSignup ? "/login" : "/signup"}
-            className="text-text underline decoration-line-strong underline-offset-4 transition-colors duration-200 hover:decoration-brand-bright"
+            className="text-text underline decoration-line-strong underline-offset-4 transition-colors duration-200 hover:decoration-text"
           >
             {isSignup ? "Sign in" : "Create one"}
           </Link>

@@ -1,7 +1,6 @@
 "use client";
 
-import { getCookie } from "cookies-next";
-import { API_BASE, MEDIA_BASE, TOKEN_COOKIE } from "@/lib/config";
+import { API_BASE, MEDIA_BASE } from "@/lib/config";
 
 /**
  * The admin API client.
@@ -90,17 +89,11 @@ export interface IngestJob {
   } | null;
 }
 
-const authHeaders = (): Record<string, string> => {
-  const token = getCookie(TOKEN_COOKIE);
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...authHeaders(),
       ...(init.headers as Record<string, string>),
     },
   });
@@ -205,9 +198,6 @@ export const uploadSource = (
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
     xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-    const token = getCookie(TOKEN_COOKIE);
-    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
     };
@@ -245,7 +235,7 @@ export const uploadSubtitle = async (
     `${API_BASE}/ingest/${id}/subtitle?${query}${extra ? `&${extra}` : ""}`,
     {
       method: "PUT",
-      headers: { "Content-Type": "text/plain", ...authHeaders() },
+      headers: { "Content-Type": "text/plain" },
       body: file,
     }
   );

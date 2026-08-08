@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const ingestController = require("../controllers/ingestController");
-const { requireAuth, requireAdmin } = require("../middleware/auth");
 
 // Every ingest route shells out to ffmpeg and writes to the local media
 // directory, neither of which exists in Lambda. Fail loudly there instead of
@@ -15,7 +14,7 @@ const requireLocalPipeline = (_req, res, next) => {
   next();
 };
 
-router.use(requireLocalPipeline, requireAuth, requireAdmin);
+router.use(requireLocalPipeline);
 
 router.put("/ingest/:id/source", ingestController.uploadSource);
 router.put("/ingest/:id/subtitle", ingestController.uploadSubtitle);

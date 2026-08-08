@@ -43,7 +43,7 @@ export default function Header() {
           href="/"
           className="shrink-0 font-display text-lg font-black tracking-[-0.045em] sm:text-[1.35rem]"
         >
-          Cartoon<span className="text-brand-bright">flix</span>
+          Cartoon<span className="text-dim">flix</span>
         </Link>
 
         <nav className="flex items-center gap-4 sm:gap-5">
@@ -74,7 +74,7 @@ export default function Header() {
         </Link>
 
         <form onSubmit={submitSearch} className="ml-auto hidden items-center sm:flex">
-          <label className="flex items-center gap-2 rounded border border-line bg-surface/70 px-3 py-2 transition-colors duration-200 focus-within:border-brand-bright">
+          <label className="flex items-center gap-2 rounded border border-line bg-surface/70 px-3 py-2 transition-colors duration-200 focus-within:border-text">
             <SearchIcon size={17} className="shrink-0 text-dim" />
             <input
               type="search"
@@ -94,7 +94,7 @@ export default function Header() {
           (user ? (
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <span className="hidden text-sm text-dim sm:inline">{user.username || user.name}</span>
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-brand-ink">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-text text-contrast-ink">
                 <UserIcon size={17} />
               </span>
               <button
@@ -108,7 +108,7 @@ export default function Header() {
           ) : (
             <Link
               href="/login"
-              className="shrink-0 whitespace-nowrap rounded bg-brand px-3.5 py-2 font-display text-sm font-bold text-brand-ink transition-colors duration-200 hover:bg-brand-bright sm:px-4"
+              className="shrink-0 whitespace-nowrap rounded bg-text px-3.5 py-2 font-display text-sm font-bold text-contrast-ink transition-colors duration-200 hover:bg-white sm:px-4"
             >
               Sign in
             </Link>

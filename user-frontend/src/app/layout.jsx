@@ -56,7 +56,7 @@ export default function RootLayout({ children }) {
               this, keyboard users cross it again after each navigation. */}
           <a
             href="#main"
-            className="sr-only focus:not-sr-only focus:absolute focus:left-5 focus:top-5 focus:z-[60] focus:rounded focus:bg-text focus:px-5 focus:py-3 focus:font-display focus:text-sm focus:font-bold focus:text-ink"
+            className="sr-only focus:not-sr-only focus:absolute focus:left-5 focus:top-5 focus:z-[60] focus:rounded focus:bg-text focus:px-5 focus:py-3 focus:font-display focus:text-sm focus:font-bold focus:text-contrast-ink"
           >
             Skip to content
           </a>

@@ -52,7 +52,7 @@ function Search() {
       <h1 className="font-display text-[clamp(1.75rem,4vw,2.75rem)] leading-[1.05]">Search</h1>
 
       <form onSubmit={submit} className="mt-6 max-w-xl">
-        <label className="flex items-center gap-3 rounded border border-line bg-surface px-4 py-3 transition-colors duration-200 ease-out focus-within:border-brand-bright">
+        <label className="flex items-center gap-3 rounded border border-line bg-surface px-4 py-3 transition-colors duration-200 ease-out focus-within:border-text">
           <SearchIcon size={19} className="shrink-0 text-dim" />
           <input
             type="search"

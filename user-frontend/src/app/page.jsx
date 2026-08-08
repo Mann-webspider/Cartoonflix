@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import Billboard from "@/components/Billboard";
 import Rail from "@/components/Rail";
 import TitleCard from "@/components/TitleCard";
@@ -45,7 +46,7 @@ export default function HomePage() {
         <button
           type="button"
           onClick={load}
-          className="mt-8 w-fit rounded bg-text px-7 py-3.5 font-display text-[0.95rem] font-bold text-ink transition-colors duration-200 hover:bg-white"
+          className="mt-8 w-fit rounded bg-text px-7 py-3.5 font-display text-[0.95rem] font-bold text-contrast-ink transition-colors duration-200 hover:bg-white"
         >
           Try again
         </button>
@@ -78,21 +79,15 @@ export default function HomePage() {
           fold — the cue that there is more below. */}
       <div className="relative z-10 -mt-10 pb-10">
         {resume.length > 0 && (
-          // The one rail that is about this viewer rather than the catalogue
-          // gets the brand field, so the colour owns a region on the page a
-          // signed-in viewer actually sees.
-          <div className="bg-brand-deep">
-            <Rail title="Continue watching">
-              {resume.map((entry) => (
-                <TitleCard
-                  key={`${contentId(entry.content)}-${entry.season}-${entry.episode}`}
-                  item={entry.content}
-                  progress={(entry.position_seconds / entry.duration_seconds) * 100}
-                  onBrand
-                />
-              ))}
-            </Rail>
-          </div>
+          <Rail title="Continue watching">
+            {resume.map((entry) => (
+              <TitleCard
+                key={`${contentId(entry.content)}-${entry.season}-${entry.episode}`}
+                item={entry.content}
+                progress={(entry.position_seconds / entry.duration_seconds) * 100}
+              />
+            ))}
+          </Rail>
         )}
 
         {rails.map((rail) => (
@@ -104,20 +99,20 @@ export default function HomePage() {
         ))}
 
         {ready && !user && (
-          <section className="mx-5 mt-10 rounded bg-brand-deep px-6 py-10 sm:mx-8 sm:px-10 lg:mx-14 lg:px-14">
-            <h2 className="max-w-2xl font-display text-[clamp(1.75rem,3.5vw,2.75rem)] leading-[1.02] text-brand-ink">
+          // Inverted panel: bone on ink is the one high-contrast move a
+          // monochrome system has, so it is spent here and nowhere else. The
+          // sheen is a single slow specular pass, not a loop of effects.
+          <section className="sheen relative mx-5 mt-12 overflow-hidden rounded-lg bg-text px-6 py-12 text-contrast-ink sm:mx-8 sm:px-12 lg:mx-14">
+            <h2 className="max-w-2xl text-[clamp(1.85rem,4vw,3rem)] leading-[0.98]">
               Sign in and it remembers where you stopped.
             </h2>
-            <p className="mt-4 max-w-prose leading-relaxed text-brand-ink/80">
-              An account keeps your place across devices and saves titles to
-              your list. Nothing else — no plans, no payment.
+            <p className="mt-4 max-w-prose leading-relaxed text-contrast-ink/70">
+              An account keeps your place across devices and saves titles to your
+              list. Nothing else — no plans, no payment.
             </p>
-            <Link
-              href="/signup"
-              className="mt-7 inline-flex rounded bg-ink px-7 py-3.5 font-display text-[0.95rem] font-bold text-text transition-colors duration-200 hover:bg-surface-2"
-            >
-              Create an account
-            </Link>
+            <Button asChild size="lg" variant="subtle" className="mt-8 bg-ink text-text hover:bg-surface-2">
+              <Link href="/signup">Create an account</Link>
+            </Button>
           </section>
         )}
       </div>

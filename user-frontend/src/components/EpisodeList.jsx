@@ -35,7 +35,7 @@ export default function EpisodeList({ contentId, seasons }) {
                 aria-pressed={option.season_number === season.season_number}
                 className={`rounded border px-3.5 py-1.5 text-sm transition duration-200 ease-out ${
                   option.season_number === season.season_number
-                    ? "border-brand bg-brand text-brand-ink"
+                    ? "border-text bg-text text-contrast-ink"
                     : "border-line text-dim hover:border-line-strong hover:text-text"
                 }`}
               >

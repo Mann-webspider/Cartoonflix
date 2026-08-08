@@ -38,80 +38,65 @@ Tokens live in `src/app/globals.css`, mapped in `tailwind.config.mjs`.
 
 | Token | Value | Job |
 |---|---|---|
-| `--ink` | `11 10 15` | Page ground. Near-black with a violet cast, so the brand fields read as part of the same surface rather than pasted on. |
-| `--surface` | `20 18 25` | Cards, inputs, skeletons. |
-| `--surface-2` | `29 26 36` | Raised surfaces, empty artwork wells, scrollbar thumb. |
-| `--text` | `246 244 250` | Primary text. |
-| `--text-dim` | `162 155 180` | Secondary text **on dark grounds only**. Tinted from the ground's hue — grey secondary text on a violet ground reads as dirt. |
-| `--brand` | `108 77 255` | Periwinkle. Short, large text only: primary buttons, active season pill, avatar. |
-| `--brand-deep` | `61 33 184` | Any brand field carrying a paragraph. |
-| `--brand-bright` | `138 114 255` | Focus rings, caret, hover on brand, the wordmark's second half. |
-| `--brand-ink` | `255 255 255` | Text on a brand field. |
-| `--ember` | `255 176 32` | Playback progress. Nothing else, ever. |
-| `--line` / `--line-strong` | `rgb(246 244 250 / .1)` / `/ .22` | Hairlines and outlined-button borders. |
+| `--ink` | `10 11 12` | Page ground. Neutral near-black. |
+| `--surface` | `22 23 25` | Cards, inputs, skeletons. |
+| `--surface-2` | `33 35 38` | Raised surfaces, empty artwork wells, scrollbar thumb. |
+| `--text` | `245 243 239` | Bone, not pure white. #FFFFFF on near-black glares at night, and the slight warmth is what separates premium from default. |
+| `--dim` | `154 154 158` | Secondary text. |
+| `--contrast-ink` | `10 11 12` | Text on an inverted (bone) surface. |
+| `--line` / `--line-strong` | `rgb(245 243 239 / .11)` / `/ .24` | Hairlines and outlined-button borders. |
 
 ### Rules that are not negotiable
 
-**1. Colour tokens are RGB channel triplets, never hex.**
-`--ink: 11 10 15`, mapped through `rgb(var(--ink) / <alpha-value>)`. Tailwind
+**1. There is no brand accent, and that is the commitment.**
+Every poster in this catalogue is loud and saturated. An interface colour would
+be a fourth thing competing with the artwork, so the chrome is neutral and the
+content is the only colour on the page. This is the discipline Apple TV+ keeps,
+and it is the reason the earlier violet-and-amber system was replaced.
+
+The primary action is **bone on ink** — inverted, not coloured. That inversion
+is the single strongest contrast move a monochrome system has, so it is spent
+on the primary action and the one promotional panel, and nowhere else.
+
+**2. Colour tokens are RGB channel triplets, never hex.**
+`--ink: 10 11 12`, mapped through `rgb(var(--ink) / <alpha-value>)`. Tailwind
 can only composite an alpha modifier onto a token it can decompose. Map a token
 to a bare `var(--x)` and *every* `bg-ink/85`-style utility resolves to nothing
 and vanishes from the built stylesheet with no error. That failure shipped once:
-the header scrim, card hover scrims, progress track, button fills and the player
-error plate all rendered with no background at all.
+the header scrim, card hover scrims, progress track and button fills all
+rendered with no background at all.
 
 `--line` and `--line-strong` are the deliberate exception — they carry their own
 alpha and are never used with a modifier.
 
-**2. `--brand` carries short, large text; `--brand-deep` carries paragraphs.**
-White on `--brand` is 5.06:1 — fine for a button label, and that is all it is
-used for. Tinted white on `--brand` is 3.76:1 and fails. On `--brand-deep`, the
-same tint is 7.4:1.
+**3. shadcn's semantic names are aliased onto these tokens** in
+`tailwind.config.mjs` (`background`, `foreground`, `primary`, `muted`, and so
+on). A shadcn component dropped into this app therefore inherits the monochrome
+system instead of importing a second palette alongside it.
 
-**3. On a brand field, secondary text tints from `--brand-ink/80`, never
-`--text-dim`.** `--text-dim` is tuned for the near-black ground; on
-`--brand-deep` it drops to 3.75:1. `TitleCard` takes an `onBrand` prop for
-exactly this.
-
-**4. `--ember` answers one question: how far through something are you.** It
-appears on exactly two things — the continue-watching progress bar and the
-player's played track (`--media-range-bar-color`). The volume slider
-deliberately does *not* use it; giving amber a second meaning costs it the
-first one.
-
-**5. Brand must own a region on every state of the home page.** Signed out, that
-is the sign-in panel. Signed in, it is the full-bleed `bg-brand-deep` band
-around Continue watching. A build where the brand only appears as a 36px avatar
-has lost the Max half of the bar.
+**4. Playback progress is bone, not a colour.** It was amber under the previous
+system; in a monochrome page a single warm bar would read as an accident rather
+than a signal.
 
 ---
 
 ## Type
 
-Helvetica Now, self-hosted as woff2 in `public/fonts/` (converted from the OTFs
-already in the repo — 623KB down to 214KB across four faces).
+**Archivo Variable**, self-hosted via `@fontsource-variable/archivo` — no
+runtime CDN call. One file covers the whole system, because Archivo's variable
+cut carries a **width** axis as well as weight: "Archivo Expanded" is this same
+font at a higher `wdth`, not a second download.
 
-| Family | Weights | Used for |
-|---|---|---|
-| Helvetica Now **Display** | 700, 900 | `h1`–`h3` and `.font-display`. Tracking `-0.03em`, `text-wrap: balance`. |
-| Helvetica Now **Text** | 400, 500 | Body, UI, controls, metadata. |
+| Role | Setting |
+|---|---|
+| Display (`h1`–`h3`, `.font-display`) | `wdth 118`, weight 800, tracking `-0.035em`, `text-wrap: balance` |
+| Body and UI | `wdth 100`, weight 400–500 |
+| `.font-display-tight` | `wdth 100` for headings inside narrow containers, like card titles |
 
-The two cuts are drawn for different sizes. Display at 14px is the mistake the
-family exists to prevent; Text at 80px is the other half of it.
-
-**`font-display: block` on the Display faces, `swap` on Text.** Text has a
-credible fallback in the system stack. Display does not — swapping an 80px
-heading to the platform sans is precisely the failure the type choice exists to
-avoid, and the Display faces are preloaded anyway, so `swap` buys nothing.
-
-Scale in use:
-
-- Billboard `h1` — `clamp(2.5rem, 7vw, 5rem)`, `leading-[0.92]`
-- Detail `h1` — `clamp(2.25rem, 6vw, 4.25rem)`, `leading-[0.94]`
-- Page `h1` — `clamp(1.75rem, 4vw, 2.75rem)`
-- Rail heading — `text-xl` bold
-- Card title — `0.95rem` bold; card meta — `0.8rem`
-- Body measure caps at `max-w-prose` (68ch)
+The width axis is what makes the display voice cinematic rather than merely
+bold: a title set wide reads as a billboard, which is the same trick a film
+logotype uses. Helvetica Now was the previous choice and read as neutral
+corporate rather than premium.
 
 `.tabular` (`font-variant-numeric: tabular-nums`) on every duration, episode
 count and clock, so digits do not jitter as they change.
@@ -162,13 +147,14 @@ The parts you did not draw still carry the design, and they are the cheapest
 proof a page was built rather than assembled. All themed in `globals.css`:
 text selection, caret colour, scrollbar track and thumb (both `scrollbar-color`
 and the `::-webkit-` pseudo-elements), the focus ring
-(`2px solid --brand-bright`, `3px` offset), and tabular numerals.
+(`2px solid --text`, `3px` offset), and tabular numerals.
 
 ---
 
 ## Components
 
-Everything in `src/components/`. Nothing here comes from a component library.
+Everything in `src/components/`. shadcn primitives live in `components/ui/`
+and are aliased onto the tokens above; the rest is authored here.
 
 - **Icons.jsx** — the whole icon set, drawn by hand. One stroke weight (1.75 at
   24px), round caps and joins; solid marks (play, pause) carry no stroke. No
@@ -180,8 +166,7 @@ Everything in `src/components/`. Nothing here comes from a component library.
 - **Rail** — native horizontal scroll, with arrows layered on for pointer users.
   The arrows are `aria-hidden` and `tabIndex={-1}` on purpose: the cards are the
   focusable path through a rail, and arrows would double every stop.
-- **TitleCard** — takes `progress` (draws the ember bar) and `onBrand` (swaps
-  the meta colour for a brand field).
+- **TitleCard** — takes `progress`, which draws the bone progress bar.
 - **Player** — see below.
 - **Skeleton** — `SkeletonBlock`, `BrowseSkeleton`, `DetailSkeleton`. One
   loading treatment across the whole app; each holds the page's shape so nothing
@@ -209,12 +194,12 @@ custom wiring.
 
 Theming lives on `.cf-player` in `globals.css`:
 
-- `--media-range-bar-color` is `--ember`. Amber keeps its single meaning here:
-  played progress. Buffered and remainder are tints of `--text`.
+- `--media-range-bar-color` is `--text`. Played, buffered and remainder are
+  three tints of the same bone, so the player stays monochrome with the page.
 - The control bar sits on an ink gradient, because it overlays moving artwork.
 - Menus use `--surface` with the standard hairline and radius; the chosen
-  quality and caption track are tinted `--brand-bright` so they read as chosen
-  rather than decorative.
+  quality and caption track are shown at full foreground weight so they read as
+  chosen rather than decorative.
 
 What the app still owns, because it is specific to this product:
 

@@ -72,7 +72,7 @@ function Watch({ id }) {
     return (
       <div className="flex min-h-screen flex-col justify-center px-5 sm:px-8 lg:px-14">
         <h1 className="font-display text-3xl">We couldn&apos;t find that title</h1>
-        <Link href="/" className="mt-6 w-fit rounded bg-text px-6 py-3 font-display text-sm font-bold text-ink">
+        <Link href="/" className="mt-6 w-fit rounded bg-text px-6 py-3 font-display text-sm font-bold text-contrast-ink">
           Back to browse
         </Link>
       </div>

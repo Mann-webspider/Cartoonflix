@@ -1,6 +1,5 @@
+import { redirect } from "next/navigation";
 
-export default function Home() {
-  return (
-    <div>home page</div>
-  );
+export default function RootPage() {
+  redirect("/admin");
 }

@@ -32,7 +32,7 @@ function Stars({ value, onChange, size = 18, label }) {
 
   if (readOnly) {
     return (
-      <span className="inline-flex gap-0.5 text-ember" aria-label={`${value} out of 5`}>
+      <span className="inline-flex gap-0.5 text-text" aria-label={`${value} out of 5`}>
         {[1, 2, 3, 4, 5].map((star) => (
           <StarIcon key={star} size={size} filled={star <= value} aria-hidden="true" />
         ))}
@@ -46,7 +46,7 @@ function Stars({ value, onChange, size = 18, label }) {
         <label
           key={star}
           className={`cursor-pointer transition-colors duration-150 ${
-            star <= value ? "text-ember" : "text-dim hover:text-text"
+            star <= value ? "text-text" : "text-dim hover:text-text"
           }`}
         >
           <input
@@ -155,7 +155,7 @@ export default function Reviews({ contentId }) {
         <p className="mb-8 max-w-prose leading-relaxed text-dim">
           <Link
             href="/login"
-            className="text-text underline decoration-line-strong underline-offset-4 hover:decoration-brand-bright"
+            className="text-text underline decoration-line-strong underline-offset-4 hover:decoration-text"
           >
             Sign in
           </Link>{" "}
@@ -176,7 +176,7 @@ export default function Reviews({ contentId }) {
             onChange={(event) => setBody(event.target.value.slice(0, MAX_LENGTH))}
             rows={4}
             placeholder="What did you think? (optional)"
-            className="mt-4 w-full rounded border border-line bg-ink px-3 py-2 text-sm leading-relaxed outline-none transition-colors duration-200 placeholder:text-dim focus:border-brand-bright"
+            className="mt-4 w-full rounded border border-line bg-ink px-3 py-2 text-sm leading-relaxed outline-none transition-colors duration-200 placeholder:text-dim focus:border-text"
           />
 
           {error && (
@@ -189,7 +189,7 @@ export default function Reviews({ contentId }) {
             <button
               type="submit"
               disabled={busy}
-              className="rounded bg-brand px-6 py-2.5 font-display text-sm font-bold text-brand-ink transition-colors duration-200 hover:bg-brand-bright disabled:opacity-60"
+              className="rounded bg-text px-6 py-2.5 font-display text-sm font-bold text-contrast-ink transition-colors duration-200 hover:bg-white disabled:opacity-60"
             >
               {busy ? "Saving…" : mine ? "Update review" : "Post review"}
             </button>

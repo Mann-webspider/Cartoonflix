@@ -1,7 +1,7 @@
-import ContentTable from "@/components/content/ContentTable";
+import Overview from "@/components/content/Overview";
 
-export const metadata = { title: "Library · CartoonFlix admin" };
+export const metadata = { title: "Overview · CartoonFlix admin" };
 
-export default function AdminLibraryPage() {
-  return <ContentTable />;
+export default function AdminOverviewPage() {
+  return <Overview />;
 }

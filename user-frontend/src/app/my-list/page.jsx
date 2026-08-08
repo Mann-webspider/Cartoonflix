@@ -71,7 +71,7 @@ function Empty({ heading, body, action }) {
       <p className="mt-4 max-w-prose leading-relaxed text-dim">{body}</p>
       <Link
         href={action.href}
-        className="mt-8 w-fit rounded bg-brand px-7 py-3.5 font-display text-[0.95rem] font-bold text-brand-ink transition-colors duration-200 hover:bg-brand-bright"
+        className="mt-8 w-fit rounded bg-text px-7 py-3.5 font-display text-[0.95rem] font-bold text-contrast-ink transition-colors duration-200 hover:bg-white"
       >
         {action.label}
       </Link>

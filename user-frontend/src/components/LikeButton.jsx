@@ -46,7 +46,7 @@ export default function LikeButton({ id, initialLiked = false, initialCount = 0 
       aria-label={liked ? "Remove like" : "Like this title"}
       className={`inline-flex h-[3.25rem] items-center gap-2 rounded border px-5 font-display text-[0.95rem] font-bold backdrop-blur transition-colors duration-200 ease-out ${
         liked
-          ? "border-brand bg-brand text-brand-ink hover:bg-brand-bright"
+          ? "border-text bg-text text-contrast-ink hover:bg-white"
           : "border-line-strong bg-ink/50 hover:bg-surface-2"
       }`}
     >

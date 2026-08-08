@@ -1,40 +1,13 @@
+/*
+  Archivo Variable, self-hosted. The `wdth` cut carries both a weight and a
+  width axis, so "Archivo Expanded" is this same file at a higher width rather
+  than a second download — one font file covers the whole type system.
+*/
+@import "@fontsource-variable/archivo/wdth.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/*
-  Helvetica Now, self-hosted. Display for headings, Text for everything small —
-  that is what the two cuts are drawn for, and using Display at 14px is the
-  mistake the family exists to prevent.
-*/
-@font-face {
-  font-family: "Helvetica Now Display";
-  src: url("/fonts/HelveticaNowDisplay-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-  font-display: block;
-}
-@font-face {
-  font-family: "Helvetica Now Display";
-  src: url("/fonts/HelveticaNowDisplay-Black.woff2") format("woff2");
-  font-weight: 900;
-  font-style: normal;
-  font-display: block;
-}
-@font-face {
-  font-family: "Helvetica Now Text";
-  src: url("/fonts/HelveticaNowText-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Helvetica Now Text";
-  src: url("/fonts/HelveticaNowText-Medium.woff2") format("woff2");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
 
 :root {
   /*
@@ -43,39 +16,34 @@
     can decompose; a bare `var(--x)` makes every `/NN` utility resolve to
     nothing and silently vanish from the built stylesheet.
 
-    Dark by use scene, not by category: this is watched in the evening, in a
-    dim room. The ground carries a violet cast rather than neutral black so
-    the brand field reads as part of the same surface.
+    MONOCHROME BY COMMITMENT. There is no brand accent, and that is the point:
+    every poster on the page is loud and saturated, so an interface colour
+    would be a fourth thing competing with the artwork. The chrome is neutral,
+    the content is the colour. This is the discipline Apple TV+ actually keeps.
+
+    Dark by use scene — evening, dim room, sofa or bed — not by category habit.
   */
-  --ink: 11 10 15;
-  --surface: 20 18 25;
-  --surface-2: 29 26 36;
+  --ink: 10 11 12;
+  --surface: 22 23 25;
+  --surface-2: 33 35 38;
 
-  --text: 246 244 250;
-  /* Tinted from the ground's hue. Gray secondary text on a violet ground
-     reads as dirt. */
-  --text-dim: 162 155 180;
+  /* Bone rather than pure white: #FFFFFF on near-black glares at night, and
+     the slight warmth is what separates premium from default. */
+  --text: 245 243 239;
+  --dim: 154 154 158;
 
-  /* Brand owns whole regions — the primary action, the active season, the
-     continue-watching field — not scattered accents. --brand carries short,
-     large text only; anything with a paragraph on it uses --brand-deep, where
-     tinted white still clears 4.5:1. */
-  --brand: 108 77 255;
-  --brand-deep: 61 33 184;
-  --brand-bright: 138 114 255;
-  --brand-ink: 255 255 255;
+  /* Inverted surfaces — the primary action is bone on ink, not a colour. */
+  --contrast-ink: 10 11 12;
 
-  /* Reserved for one job: how far through something you are. */
-  --ember: 255 176 32;
+  --line: rgb(245 243 239 / 0.11);
+  --line-strong: rgb(245 243 239 / 0.24);
 
-  --line: rgb(246 244 250 / 0.1);
-  --line-strong: rgb(246 244 250 / 0.22);
-
-  --radius: 10px;
+  --radius: 8px;
 
   /* Exponential ease-out. Everything decelerates from an already-visible
      default; nothing fades in from nothing. */
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 html {
@@ -86,20 +54,31 @@ html {
 body {
   color: rgb(var(--text));
   background: rgb(var(--ink));
-  font-family: "Helvetica Now Text", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+  font-variation-settings: "wdth" 100;
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
+/*
+  Display voice: Archivo at maximum width and weight. The width axis is what
+  makes it cinematic rather than merely bold — a title set wide reads as a
+  billboard, the same trick a film logotype uses.
+*/
 h1,
 h2,
 h3,
 .font-display {
-  font-family: "Helvetica Now Display", "Helvetica Now Text", ui-sans-serif, sans-serif;
-  font-weight: 900;
-  letter-spacing: -0.03em;
+  font-variation-settings: "wdth" 118;
+  font-weight: 800;
+  letter-spacing: -0.035em;
   text-wrap: balance;
+}
+
+.font-display-tight {
+  font-variation-settings: "wdth" 100;
+  letter-spacing: -0.02em;
 }
 
 /*
@@ -107,12 +86,12 @@ h3,
   and theming them is the cheapest proof a page was built rather than assembled.
 */
 ::selection {
-  background: rgb(var(--brand));
-  color: rgb(var(--brand-ink));
+  background: rgb(var(--text));
+  color: rgb(var(--contrast-ink));
 }
 
 :where(input, textarea) {
-  caret-color: rgb(var(--brand-bright));
+  caret-color: rgb(var(--text));
 }
 
 ::-webkit-scrollbar {
@@ -128,11 +107,11 @@ h3,
   border: 2px solid rgb(var(--ink));
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(43 38 53);
+  background: rgb(58 60 64);
 }
 
 :where(a, button, input, [tabindex]):focus-visible {
-  outline: 2px solid rgb(var(--brand-bright));
+  outline: 2px solid rgb(var(--text));
   outline-offset: 3px;
   border-radius: 4px;
 }
@@ -145,29 +124,23 @@ h3,
 
 /*
   Media Chrome, wearing this design system rather than arriving with its own.
-
-  The library owns the control bar, the captions and quality menus, PiP and
-  fullscreen — a large surface that is easy to build badly. What it must not
-  own is the look, so every one of its theme variables points at the same
-  tokens the rest of the app uses. Amber keeps its single meaning here too: it
-  marks how far through you are, and nothing else.
+  Monochrome here too: played progress is bone, not a colour, because a colour
+  would be the only one on the page and would read as an accident.
 */
 .cf-player {
-  --media-font-family: "Helvetica Now Text", ui-sans-serif, system-ui, sans-serif;
+  --media-font-family: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
   --media-primary-color: rgb(var(--text));
   --media-secondary-color: transparent;
   --media-text-color: rgb(var(--text));
   --media-icon-color: rgb(var(--text));
 
-  /* The control bar sits on moving artwork, so it needs its own plate. */
   --media-control-background: transparent;
   --media-control-hover-background: rgb(var(--text) / 0.14);
   --media-control-bar-display: flex;
 
-  /* Played is amber; buffered and remainder are tints of the foreground. */
-  --media-range-bar-color: rgb(var(--ember));
-  --media-range-track-color: rgb(var(--text) / 0.12);
-  --media-range-track-progress-internal-color: rgb(var(--text) / 0.3);
+  --media-range-bar-color: rgb(var(--text));
+  --media-range-track-color: rgb(var(--text) / 0.14);
+  --media-range-track-progress-internal-color: rgb(var(--text) / 0.34);
   --media-range-thumb-background: rgb(var(--text));
   --media-range-track-height: 4px;
   --media-range-thumb-height: 13px;
@@ -181,20 +154,17 @@ h3,
 
   --media-tooltip-background: rgb(var(--surface-2));
   --media-tooltip-border: 1px solid var(--line);
-
   --media-preview-time-text-shadow: none;
 }
 
-.cf-player::part(top),
 .cf-player media-control-bar {
-  background: linear-gradient(to top, rgb(var(--ink)) 0%, rgb(var(--ink) / 0.72) 55%, transparent 100%);
+  background: linear-gradient(
+    to top,
+    rgb(var(--ink)) 0%,
+    rgb(var(--ink) / 0.72) 55%,
+    transparent 100%
+  );
   padding: 2.5rem 0.5rem 0.35rem;
-}
-
-/* The chosen quality and caption track read as chosen, not decorative. */
-.cf-player [role="menuitemradio"][aria-checked="true"],
-.cf-player [aria-checked="true"] {
-  color: rgb(var(--brand-bright));
 }
 
 /* Loading placeholders breathe rather than blink. */
@@ -205,6 +175,31 @@ h3,
   }
   50% {
     opacity: 0.45;
+  }
+}
+
+/*
+  Motion. Two authored moments, not scattered effects:
+  `rise` brings a section up as it enters, `sweep` runs a single specular pass
+  across a promotional panel. Both are opt-in via class.
+*/
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sweep {
+  0% {
+    transform: translateX(-120%) skewX(-12deg);
+  }
+  100% {
+    transform: translateX(320%) skewX(-12deg);
   }
 }
 
@@ -220,13 +215,29 @@ h3,
   /* Keeps billboard artwork legible under the copy that sits on it. */
   .billboard-scrim {
     background:
-      linear-gradient(to top, rgb(var(--ink)) 4%, rgb(var(--ink) / 0.55) 45%, transparent 78%),
-      linear-gradient(to right, rgb(var(--ink)) 2%, rgb(var(--ink) / 0.82) 32%, transparent 68%);
+      linear-gradient(to top, rgb(var(--ink)) 3%, rgb(var(--ink) / 0.5) 46%, transparent 80%),
+      linear-gradient(to right, rgb(var(--ink)) 2%, rgb(var(--ink) / 0.8) 34%, transparent 70%);
   }
 
-  .rail-fade-r {
-    -webkit-mask-image: linear-gradient(to right, #000 92%, transparent 100%);
-    mask-image: linear-gradient(to right, #000 92%, transparent 100%);
+  .animate-rise {
+    animation: rise 0.7s var(--ease) both;
+  }
+
+  /* One slow specular pass over a panel. Decorative, so it is hidden from
+     assistive tech and stops entirely under reduced motion. */
+  .sheen::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(var(--text) / 0.09),
+      transparent
+    );
+    width: 40%;
+    animation: sweep 5.5s var(--ease) infinite;
+    pointer-events: none;
   }
 }
 
@@ -235,6 +246,10 @@ h3,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+  .sheen::after {
+    display: none;
   }
 }

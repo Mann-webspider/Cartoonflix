@@ -7,5 +7,3 @@ export const API_BASE =
 // during ingest (`/media/<slug>/thumbs/...`).
 export const MEDIA_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, "");
 
-export const TOKEN_COOKIE = "cf_admin_token";
-export const USER_COOKIE = "cf_admin_user";
