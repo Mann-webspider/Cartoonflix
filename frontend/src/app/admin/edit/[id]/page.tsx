@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,12 +8,16 @@ import ContentEditor from "@/components/content/ContentEditor";
 import { getContent, type Content } from "@/lib/api";
 
 /**
- * Client-side rather than a server component: the admin token lives in a
- * cookie this browser holds, and the editor needs authenticated writes
- * anyway, so fetching here keeps one auth path instead of two.
+ * Client-side rather than a server component: the editor needs to re-read the
+ * document after every ingest step, so it owns the fetch.
+ *
+ * `params` is a plain object here, not a Promise. This app is on Next 14,
+ * where params are synchronous; only Next 15 (which the viewer app runs)
+ * makes them a Promise that needs unwrapping with `use()`. Passing a plain
+ * object to `use()` throws "An unsupported type was passed to use()".
  */
-export default function EditContentPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function EditContentPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const [content, setContent] = useState<Content | null>(null);
   const [error, setError] = useState<string | null>(null);
 
