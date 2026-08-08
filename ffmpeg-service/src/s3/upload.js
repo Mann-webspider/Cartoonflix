@@ -9,6 +9,8 @@ export const contentTypeFor = (file) =>
   : file.endsWith(".ts") ? "video/mp2t"
   : file.endsWith(".jpg") || file.endsWith(".jpeg") ? "image/jpeg"
   : file.endsWith(".png") ? "image/png"
+  // Browsers refuse a text track served as octet-stream.
+  : file.endsWith(".vtt") ? "text/vtt"
   : "application/octet-stream";
 
 /**

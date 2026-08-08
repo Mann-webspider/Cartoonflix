@@ -70,3 +70,16 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "hls" {
     }
   }
 }
+
+# CloudFront serves this bucket and attaches its own CORS headers, but the
+# origin must allow the request for CloudFront to have anything to forward.
+resource "aws_s3_bucket_cors_configuration" "hls" {
+  bucket = aws_s3_bucket.hls.id
+  cors_rule {
+    allowed_methods = ["GET", "HEAD"]
+    allowed_origins = ["*"]
+    allowed_headers = ["*"]
+    expose_headers  = ["Content-Length", "Content-Range", "Content-Type"]
+    max_age_seconds = 3000
+  }
+}

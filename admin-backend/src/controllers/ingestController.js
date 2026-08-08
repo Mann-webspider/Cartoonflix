@@ -2,7 +2,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { pipeline } = require("node:stream/promises");
 const Content = require("../models/contentModel");
-const { slugFor, jobDir, getJob, startIngest, runPublish } = require("../ingest/jobs");
+const {
+  slugFor,
+  jobDir,
+  getJob,
+  startIngest,
+  runPublish,
+  runSubtitleConvert,
+} = require("../ingest/jobs");
 
 const ALLOWED_SOURCE_EXTENSIONS = new Set([
   ".mp4",
@@ -76,6 +83,56 @@ exports.uploadSource = async (req, res) => {
   } catch (err) {
     console.error("uploadSource failed:", err);
     res.status(500).json({ error: "Failed to store the uploaded source" });
+  }
+};
+
+const SUBTITLE_EXTENSIONS = new Set([".srt", ".vtt", ".ass", ".ssa", ".sub"]);
+
+/**
+ * Accept a sidecar subtitle file and convert it to WebVTT.
+ *
+ * Plenty of sources carry no embedded tracks — an mp4 rip usually has none,
+ * while the subtitles sit in a separate file beside it. The converted track
+ * joins the job's manifest, so the next publish uploads it with everything
+ * else rather than needing its own upload path.
+ */
+exports.uploadSubtitle = async (req, res) => {
+  try {
+    const { contentId, slug } = coordinates(req);
+    const fileName = String(req.query.filename || "");
+    const extension = path.extname(fileName).toLowerCase();
+    const language = String(req.query.language || "").trim();
+
+    if (!SUBTITLE_EXTENSIONS.has(extension)) {
+      return res.status(400).json({
+        error: `Unsupported subtitle type "${extension || fileName}". Allowed: ${[...SUBTITLE_EXTENSIONS].join(", ")}`,
+      });
+    }
+    if (!language) {
+      return res.status(400).json({ error: "A language code is required (for example: en)" });
+    }
+    if (!fs.existsSync(path.join(jobDir(slug), "manifest.json"))) {
+      return res.status(400).json({ error: "Transcode this item before adding subtitles" });
+    }
+
+    // Held next to the job so a failed conversion leaves something to inspect.
+    const uploadDir = path.join(jobDir(slug), "subs-src");
+    fs.mkdirSync(uploadDir, { recursive: true });
+    const destination = path.join(uploadDir, `${Date.now()}${extension}`);
+    await pipeline(req, fs.createWriteStream(destination));
+
+    const { track } = await runSubtitleConvert({
+      slug,
+      contentId,
+      filePath: destination,
+      language,
+      label: req.query.label ? String(req.query.label) : undefined,
+    });
+
+    res.status(201).json({ track });
+  } catch (err) {
+    console.error("uploadSubtitle failed:", err);
+    res.status(500).json({ error: err.message || "Failed to add the subtitle track" });
   }
 };
 
@@ -168,6 +225,8 @@ exports.publishIngest = async (req, res) => {
         video_url: result.videoUrl,
         thumbnail_url: result.thumbnailUrl || result.posterUrl,
         duration_seconds: result.durationSec,
+        subtitles: result.subtitles || [],
+        status: "ready",
       });
       // A series is ready once it has at least one playable episode.
       content.status = "ready";
@@ -176,6 +235,7 @@ exports.publishIngest = async (req, res) => {
     } else {
       content.video_url = result.videoUrl;
       content.duration_seconds = result.durationSec;
+      content.subtitles = result.subtitles || [];
       content.status = "ready";
       content.isReady = true;
       if (result.posterUrl) content.poster_url = result.posterUrl;

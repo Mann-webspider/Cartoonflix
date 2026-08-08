@@ -26,12 +26,18 @@ export const ffmpegPath = (...parts) => path.join(...parts).replace(/\\/g, "/");
 
 /**
  * Never upscale: a 720p source gets 480p + 720p, not a fake 1080p that costs
- * bitrate and adds no detail. The lowest rung always survives so even a tiny
- * source still produces a valid ladder.
+ * bitrate and adds no detail.
+ *
+ * A source below the lowest rung is encoded at its own height rather than
+ * stretched up to 480p — the same reasoning, applied at the bottom of the
+ * ladder instead of the top.
  */
 export const ladderFor = (sourceHeight) => {
   const fits = LADDER.filter((r) => r.height <= sourceHeight);
-  return fits.length ? fits : [LADDER[0]];
+  if (fits.length) return fits;
+  // Even heights only: H.264 chroma subsampling cannot represent an odd one.
+  const height = Math.max(2, sourceHeight - (sourceHeight % 2));
+  return [{ ...LADDER[0], name: `${height}p`, height }];
 };
 
 const videoCodecArgs = (index, rendition, gop) => {

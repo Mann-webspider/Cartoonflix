@@ -3,6 +3,7 @@ import path from "node:path";
 import { probe } from "./transcode/probe.js";
 import { transcodeToHLS } from "./transcode/hls.js";
 import { extractThumbnails } from "./transcode/thumbnails.js";
+import { extractSubtitles } from "./transcode/subtitles.js";
 
 export const MEDIA_ROOT = process.env.MEDIA_ROOT || path.resolve("media");
 
@@ -21,7 +22,12 @@ export const jobDir = (slug, root = MEDIA_ROOT) => path.join(root, ...slug.split
  * Percent of the whole job, per stage. Transcoding dominates the wall clock, so
  * it owns the bulk of the bar and the other stages get token slices.
  */
-const STAGES = { probe: [0, 2], transcode: [2, 92], thumbnails: [92, 100] };
+const STAGES = {
+  probe: [0, 2],
+  transcode: [2, 88],
+  subtitles: [88, 92],
+  thumbnails: [92, 100],
+};
 const overall = (stage, percent) => {
   const [from, to] = STAGES[stage];
   return Math.round(from + ((to - from) * (percent ?? 0)) / 100);
@@ -55,6 +61,7 @@ export const ingest = async ({
   const dir = jobDir(slug, root);
   const hlsDir = path.join(dir, "hls");
   const thumbsDir = path.join(dir, "thumbs");
+  const subsDir = path.join(dir, "subs");
   fs.mkdirSync(dir, { recursive: true });
 
   onProgress({ stage: "probe", percent: overall("probe", 0) });
@@ -63,6 +70,13 @@ export const ingest = async ({
   onProgress({ stage: "transcode", percent: overall("transcode", 0) });
   const hls = await transcodeToHLS(sourcePath, hlsDir, source, ({ percent }) =>
     onProgress({ stage: "transcode", percent: overall("transcode", percent) })
+  );
+
+  onProgress({ stage: "subtitles", percent: overall("subtitles", 0) });
+  const { tracks: subtitles, skipped: skippedSubtitles } = await extractSubtitles(
+    sourcePath,
+    subsDir,
+    source.subtitles
   );
 
   onProgress({ stage: "thumbnails", percent: overall("thumbnails", 0) });
@@ -90,6 +104,10 @@ export const ingest = async ({
       segmentSeconds: hls.segmentSeconds,
     },
     thumbnails,
+    subtitles,
+    // Recorded so the admin can see WHY a track is missing — a Blu-ray rip with
+    // only PGS subtitles otherwise looks like the pipeline simply ignored them.
+    skippedSubtitles,
     completedAt: new Date().toISOString(),
   };
 
@@ -102,4 +120,10 @@ export const ingest = async ({
 export const readManifest = (slug, root = MEDIA_ROOT) => {
   const file = path.join(jobDir(slug, root), "manifest.json");
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : null;
+};
+
+export const writeManifest = (slug, manifest, root = MEDIA_ROOT) => {
+  const file = path.join(jobDir(slug, root), "manifest.json");
+  fs.writeFileSync(file, JSON.stringify(manifest, null, 2));
+  return manifest;
 };

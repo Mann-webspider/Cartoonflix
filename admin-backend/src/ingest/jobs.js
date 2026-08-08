@@ -113,22 +113,22 @@ const startIngest = ({ slug, contentId, sourcePath, thumbnails }) => {
   return job;
 };
 
-/**
- * Run the CLI's publish command and resolve with the URLs it prints.
- * Uploading is short and the admin is waiting on the result, so unlike ingest
- * this one is awaited rather than tracked as a background job.
- */
-const runPublish = ({ slug, contentId, poster, thumbnail }) =>
-  new Promise((resolve, reject) => {
-    const args = ["src/cli.js", "publish", "--content", contentId, "--json"];
-    const [, seasonEpisode] = slug.split("/");
-    if (seasonEpisode) {
-      const [, season, episode] = seasonEpisode.match(/^s(\d+)e(\d+)$/) || [];
-      if (season) args.push("--season", season, "--episode", episode);
-    }
-    if (poster) args.push("--poster", poster);
-    if (thumbnail) args.push("--thumbnail", thumbnail);
+/** Append the season/episode flags a slug implies, if any. */
+const appendEpisodeFlags = (args, slug) => {
+  const [, seasonEpisode] = slug.split("/");
+  if (!seasonEpisode) return args;
+  const [, season, episode] = seasonEpisode.match(/^s(\d+)e(\d+)$/) || [];
+  if (season) args.push("--season", season, "--episode", episode);
+  return args;
+};
 
+/**
+ * Run a short CLI command and resolve with the last JSON event it printed.
+ * Publishing and subtitle conversion both finish in seconds with the admin
+ * waiting on the result, so unlike a transcode neither is tracked as a job.
+ */
+const runCli = (args) =>
+  new Promise((resolve, reject) => {
     const child = spawn(process.execPath, args, {
       cwd: FFMPEG_SERVICE_DIR,
       env: { ...process.env, MEDIA_ROOT },
@@ -152,9 +152,38 @@ const runPublish = ({ slug, contentId, poster, thumbnail }) =>
         })
         .findLast(Boolean);
 
-      if (code === 0 && event?.type === "published") return resolve(event);
-      reject(new Error(event?.message || stderr.trim() || `publish exited ${code}`));
+      if (code === 0 && event && event.type !== "error") return resolve(event);
+      reject(new Error(event?.message || stderr.trim() || `${args[1]} exited ${code}`));
     });
   });
 
-module.exports = { MEDIA_ROOT, slugFor, jobDir, getJob, listJobs, startIngest, runPublish };
+const runPublish = ({ slug, contentId, poster, thumbnail }) => {
+  const args = appendEpisodeFlags(
+    ["src/cli.js", "publish", "--content", contentId, "--json"],
+    slug
+  );
+  if (poster) args.push("--poster", poster);
+  if (thumbnail) args.push("--thumbnail", thumbnail);
+  return runCli(args);
+};
+
+/** Convert an uploaded sidecar to WebVTT and record it on the job's manifest. */
+const runSubtitleConvert = ({ slug, contentId, filePath, language, label }) => {
+  const args = appendEpisodeFlags(
+    ["src/cli.js", "subtitle", "--content", contentId, "--file", filePath, "--language", language, "--json"],
+    slug
+  );
+  if (label) args.push("--label", label);
+  return runCli(args);
+};
+
+module.exports = {
+  MEDIA_ROOT,
+  slugFor,
+  jobDir,
+  getJob,
+  listJobs,
+  startIngest,
+  runPublish,
+  runSubtitleConvert,
+};

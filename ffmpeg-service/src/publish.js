@@ -44,6 +44,22 @@ export const publish = async ({
   const dir = jobDir(slug, root);
   await uploadDir(hlsBucket, path.join(dir, "hls"), slug);
 
+  // Subtitles sit beside the stream under the same prefix, so one CloudFront
+  // behaviour and one CORS policy cover both.
+  const subsDir = path.join(dir, "subs");
+  const subtitles = [];
+  if (fs.existsSync(subsDir) && (manifest.subtitles?.length ?? 0) > 0) {
+    await uploadDir(hlsBucket, subsDir, `${slug}/subs`);
+    for (const track of manifest.subtitles) {
+      subtitles.push({
+        language: track.language,
+        label: track.label,
+        url: cdnUrl(cloudfrontDomain, `${slug}/subs/${track.file}`),
+        source: track.source,
+      });
+    }
+  }
+
   // Episodes each need their own still, so the object name carries the slug's
   // episode part rather than a fixed "poster.jpg" that siblings would overwrite.
   const suffix = slug === contentId ? "" : `-${slug.split("/").pop()}`;
@@ -69,5 +85,6 @@ export const publish = async ({
     posterUrl: await uploadStill(poster, "poster"),
     thumbnailUrl: await uploadStill(thumbnail, "thumb"),
     durationSec: manifest.source.durationSec,
+    subtitles,
   };
 };
