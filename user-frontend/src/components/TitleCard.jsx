@@ -64,7 +64,7 @@ export default function TitleCard({ item, progress, onBrand = false }) {
       </div>
 
       <div className="mt-3">
-        <h3 className="truncate font-display text-[0.95rem] font-bold tracking-[-0.01em]">
+        <h3 className="truncate font-sans text-[0.95rem] font-medium tracking-[-0.01em]">
           {item.title}
         </h3>
         {/* --text-dim is tuned for the near-black ground and only reaches
