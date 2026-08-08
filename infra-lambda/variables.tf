@@ -20,6 +20,20 @@ variable "jwt_secret" {
   description = "Signs viewer tokens. Changing it invalidates every session."
   type        = string
   sensitive   = true
+
+  # A deploy went out with the placeholder from terraform.tfvars.example still
+  # in place. That string is published in this repository, so anyone could have
+  # forged a token for any account — including one claiming role "admin".
+  # Terraform now refuses rather than letting it happen silently again.
+  validation {
+    condition     = length(var.jwt_secret) >= 32
+    error_message = "jwt_secret must be at least 32 characters. Generate one: openssl rand -base64 48"
+  }
+
+  validation {
+    condition     = !can(regex("(?i)replace|example|changeme|placeholder|secret123", var.jwt_secret))
+    error_message = "jwt_secret still looks like a placeholder. Generate a real one: openssl rand -base64 48"
+  }
 }
 
 variable "allowed_origins" {

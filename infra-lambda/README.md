@@ -92,6 +92,37 @@ Logs:
 aws logs tail "$(terraform output -raw log_group)" --follow
 ```
 
+## Function URL permissions
+
+Anonymous access needs **two** statements, not one:
+
+| Action | Purpose |
+|---|---|
+| `lambda:InvokeFunctionUrl` | Permission to use the URL. Documented, and the obvious one. |
+| `lambda:InvokeFunction` | Permission to actually run the function. **Also required.** |
+
+With only the first, every route returns
+
+```
+{"Message":"Forbidden. For troubleshooting Function URL authorization issues, ..."}
+```
+
+even with `AuthType: NONE` and a correct-looking policy. Verified live: adding
+the second turned a 403 into a 200 immediately. The AWS console writes both when
+it creates a URL, which is why console-made functions work and Terraform-made
+ones did not.
+
+The second grant carries no condition, because the Lambda API rejects
+`FunctionUrlAuthType` alongside `lambda:InvokeFunction` and
+`aws_lambda_permission` cannot express the console's `lambda:InvokedViaFunctionUrl`
+condition. `Principal: "*"` means any AWS principal, not the anonymous internet —
+the Invoke API requires a SigV4-signed request. To match the console's tighter
+scope, edit that statement in the console afterwards and add:
+
+```json
+"Condition": { "Bool": { "lambda:InvokedViaFunctionUrl": "true" } }
+```
+
 ## Notes
 
 - **CORS is set by the application, not by the Function URL.** Configuring both

@@ -111,11 +111,33 @@ resource "aws_lambda_function_url" "this" {
   authorization_type = "NONE"
 }
 
-# Without this the URL exists and returns 403 to everyone, including you.
+# Anonymous access through a Function URL needs BOTH of the permissions below.
+#
+# The documented one is lambda:InvokeFunctionUrl. On its own it is not enough:
+# verified on a live function, every route returned
+#   {"Message":"Forbidden. For troubleshooting Function URL authorization..."}
+# with AuthType NONE and this statement present, and started returning 200 the
+# moment lambda:InvokeFunction was added. The AWS console writes both when it
+# creates a URL, which is why console-made functions work and this did not.
 resource "aws_lambda_permission" "function_url" {
   statement_id           = "AllowPublicFunctionUrlAccess"
   action                 = "lambda:InvokeFunctionUrl"
   function_name          = aws_lambda_function.this.function_name
   principal              = "*"
   function_url_auth_type = "NONE"
+}
+
+# The second half. Note this one carries no condition: the API rejects
+# FunctionUrlAuthType alongside lambda:InvokeFunction, and aws_lambda_permission
+# cannot express the console's `lambda:InvokedViaFunctionUrl` condition.
+#
+# Principal "*" here means any AWS principal, not the anonymous internet — the
+# Invoke API requires a SigV4-signed request, so unsigned callers still cannot
+# use it. It is nonetheless broader than the console's version, which is scoped
+# to URL invocations only. See README for tightening it by hand.
+resource "aws_lambda_permission" "function_url_invoke" {
+  statement_id  = "AllowFunctionUrlInvokeAction"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.this.function_name
+  principal     = "*"
 }

@@ -1,10 +1,16 @@
 # Copy to terraform.tfvars and fill in. NEVER commit the real file.
 
-mongo_uri  = "mongodb+srv://USER:PASS@CLUSTER.mongodb.net/"
-jwt_secret = "replace-with-a-long-random-string"
+mongo_uri = "mongodb+srv://USER:PASS@CLUSTER.mongodb.net/"
 
-# Add the viewer app's origin once it has one. Leaving "*" works, but browsers
-# will not send credentialed requests to a wildcard.
+# Generate this, do not invent one by hand and do NOT leave it as-is:
+#   openssl rand -base64 48
+# Terraform rejects placeholders and anything under 32 characters, because a
+# deploy once went out with the example value still in place — which is public
+# in this repository, so tokens could have been forged for any account.
+jwt_secret = "PASTE_OUTPUT_OF_openssl_rand_base64_48_HERE"
+
+# Add the viewer app's origin once it has one. "*" works to get started, but
+# browsers will not send credentialed requests to a wildcard origin.
 allowed_origins = ["*"]
 
 # aws_region    = "ap-south-1"
