@@ -27,6 +27,9 @@ func main() {
 	if err := controllers.EnsureSocialIndexes(context.Background()); err != nil {
 		log.Printf("Could not ensure social indexes: %v", err)
 	}
+	if err := controllers.EnsureCommentIndexes(context.Background()); err != nil {
+		log.Printf("Could not ensure comment indexes: %v", err)
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {

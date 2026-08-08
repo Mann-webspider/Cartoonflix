@@ -135,7 +135,8 @@ const search = async (query, { type = 'movie', year } = {}) => {
     original_title: isSeries ? result.original_name : result.original_title,
     release_date: isSeries ? result.first_air_date : result.release_date,
     description: result.overview,
-    poster_url: imageUrl(result.poster_path, 'w342'),
+    poster_url: imageUrl(result.poster_path, 'original'),
+    backdrop_url: imageUrl(result.backdrop_path, 'original'),
     tmdb_score: result.vote_average,
   }));
 };

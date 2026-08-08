@@ -60,6 +60,31 @@ func publicUser(u User) fiber.Map {
 	}
 }
 
+// displayNameFor resolves the name shown beside a review or comment.
+//
+// Read from the database rather than taken from the request, so a post cannot
+// be attributed to someone else by editing the payload. Falls back to a neutral
+// label rather than failing the write — losing a name is not worth losing the
+// comment.
+func displayNameFor(ctx context.Context, userID string) string {
+	id, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return "Viewer"
+	}
+
+	var user User
+	if err := users().FindOne(ctx, bson.M{"_id": id}).Decode(&user); err != nil {
+		return "Viewer"
+	}
+	if user.Username != "" {
+		return user.Username
+	}
+	if user.Name != "" {
+		return user.Name
+	}
+	return "Viewer"
+}
+
 // Claims match what the admin API mints so one JWT_SECRET covers both services.
 func mintToken(u User) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{

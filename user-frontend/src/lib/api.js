@@ -165,6 +165,32 @@ export async function deleteReview(id) {
   return request(`/contents/${encodeURIComponent(id)}/reviews`, { method: "DELETE" });
 }
 
+// --- Comments ---
+//
+// Discussion, distinct from reviews: many per person, no rating, and shown
+// beside the player rather than on the title page.
+
+export async function getComments(id) {
+  if (!API) return [];
+  const { data } = await request(`/contents/${encodeURIComponent(id)}/comments`);
+  return data || [];
+}
+
+export async function addComment(id, { text, season, episode }) {
+  const { data } = await request(`/contents/${encodeURIComponent(id)}/comments`, {
+    method: "POST",
+    body: JSON.stringify({ text, season: season || 0, episode: episode || 0 }),
+  });
+  return data;
+}
+
+export async function deleteComment(id, commentId) {
+  return request(
+    `/contents/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}`,
+    { method: "DELETE" }
+  );
+}
+
 const MY_LIST = "watchlist";
 
 export async function getMyList() {

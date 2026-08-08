@@ -235,20 +235,7 @@ func SaveReview(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// The display name is read now rather than trusted from the client, so a
-	// review cannot be attributed to someone else.
-	username := "Viewer"
-	if id, err := primitive.ObjectIDFromHex(userID); err == nil {
-		var user User
-		if err := users().FindOne(ctx, bson.M{"_id": id}).Decode(&user); err == nil {
-			if user.Username != "" {
-				username = user.Username
-			} else if user.Name != "" {
-				username = user.Name
-			}
-		}
-	}
-
+	username := displayNameFor(ctx, userID)
 	now := time.Now()
 	update := bson.M{
 		"$set": bson.M{

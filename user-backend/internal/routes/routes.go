@@ -25,7 +25,6 @@ func SetupRoutes(app *fiber.App) {
 	api.Get("/contents", controllers.GetContent)
 	api.Get("/contents/:id", controllers.GetSingleContent)
 	api.Get("/search", controllers.SearchContent)
-	api.Get("/comments", controllers.GetComments)
 
 	// Social. The read endpoints work signed out and simply omit the personal
 	// half; writing requires an account.
@@ -35,6 +34,12 @@ func SetupRoutes(app *fiber.App) {
 	api.Post("/contents/:id/reviews", middleware.RequireAuth, controllers.SaveReview)
 	api.Delete("/contents/:id/reviews", middleware.RequireAuth, controllers.DeleteReview)
 
+	// Comments are discussion rather than evaluation, so they sit beside the
+	// player instead of on the title page. Reading is open; posting is not.
+	api.Get("/contents/:id/comments", controllers.ListComments)
+	api.Post("/contents/:id/comments", middleware.RequireAuth, controllers.AddComment)
+	api.Delete("/contents/:id/comments/:commentId", middleware.RequireAuth, controllers.DeleteComment)
+
 	// Personalisation — everything here is scoped to the token's user.
 	me := api.Group("/me", middleware.RequireAuth)
 	me.Get("/continue", controllers.ContinueWatching)
@@ -42,5 +47,4 @@ func SetupRoutes(app *fiber.App) {
 
 	api.Post("/preferences", middleware.RequireAuth, controllers.AddPreference)
 	api.Get("/preferences", middleware.RequireAuth, controllers.GetPreferences)
-	api.Post("/comments", middleware.RequireAuth, controllers.AddComment)
 }

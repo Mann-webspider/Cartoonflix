@@ -12,14 +12,13 @@ import TitleCard from "@/components/TitleCard";
 import { PlayIcon } from "@/components/Icons";
 import { Button } from "@/components/ui/button";
 import { DetailSkeleton } from "@/components/Skeleton";
+import { TitleFacts, TitleCredits, CastRail } from "@/components/TitleMeta";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import {
   contentId,
-  formatRuntime,
   getContent,
   getContents,
   getSocial,
-  totalEpisodes,
 } from "@/lib/api";
 
 export default function TitlePage({ params }) {
@@ -88,30 +87,7 @@ export default function TitlePage({ params }) {
   }
 
   const art = item.backdrop_url || item.poster_url || item.thumbnail_url;
-  const episodes = totalEpisodes(item);
   const isSeries = item.type === "series";
-  const year = (item.release_date || item.releaseDate || "").slice(0, 4);
-
-  const facts = [
-    isSeries ? "Series" : "Film",
-    year,
-    item.certification,
-    isSeries
-      ? episodes && `${episodes} episode${episodes === 1 ? "" : "s"}`
-      : formatRuntime(item.duration_seconds) ||
-        (item.runtime_minutes && `${item.runtime_minutes}m`),
-    item.tmdb_score ? `${item.tmdb_score.toFixed(1)} on TMDB` : null,
-  ].filter(Boolean);
-
-  // Everything TMDB filled in, rendered only where it actually has a value.
-  const credits = [
-    { label: "Genres", value: item.genres?.join(", ") },
-    { label: item.directors?.length === 1 ? "Director" : "Directors", value: item.directors?.join(", ") },
-    { label: item.writers?.length === 1 ? "Writer" : "Writers", value: item.writers?.slice(0, 4).join(", ") },
-    { label: "Studio", value: item.studios?.slice(0, 3).join(", ") },
-    { label: "Languages", value: item.languages?.map((l) => l.name).join(", ") },
-    { label: "Tags", value: item.tags?.slice(0, 6).join(", ") },
-  ].filter((row) => row.value);
 
   const firstEpisode = [...(item.seasons || [])].sort(
     (a, b) => a.season_number - b.season_number
@@ -138,14 +114,7 @@ export default function TitlePage({ params }) {
               {item.title}
             </h1>
 
-            <p className="mt-5 flex flex-wrap items-center gap-x-3 text-sm text-dim tabular">
-              {facts.map((fact, index) => (
-                <span key={fact} className="flex items-center gap-3">
-                  {index > 0 && <span aria-hidden="true" className="text-dim/70">·</span>}
-                  {fact}
-                </span>
-              ))}
-            </p>
+            <TitleFacts item={item} className="mt-5" />
 
             {item.description && (
               <p className="mt-5 max-w-prose leading-relaxed text-dim">{item.description}</p>
@@ -170,52 +139,12 @@ export default function TitlePage({ params }) {
               <ShareButton title={item.title} />
             </div>
 
-            {credits.length > 0 && (
-              <dl className="mt-10 grid gap-x-10 gap-y-4 border-t border-line pt-6 text-sm sm:grid-cols-2">
-                {credits.map((row) => (
-                  <div key={row.label}>
-                    <dt className="text-dim">{row.label}</dt>
-                    <dd className="mt-1">{row.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            )}
+            <TitleCredits item={item} className="mt-10 border-t border-line pt-6" />
           </div>
         </div>
       </section>
 
-      {/* Cast gets its own rail rather than a comma-separated list: faces are
-          how people recognise an animated series, and TMDB supplies them. */}
-      {item.cast?.length > 0 && (
-        <section className="px-5 py-12 sm:px-8 lg:px-14">
-          <h2 className="mb-5 text-xl font-bold">Cast</h2>
-          <ul className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
-            {item.cast.slice(0, 16).map((person) => (
-              <li key={`${person.name}-${person.character}`} className="w-28 shrink-0">
-                <div className="aspect-[2/3] overflow-hidden rounded bg-surface">
-                  {person.profile_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={person.profile_url}
-                      alt=""
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center px-2 text-center text-xs text-dim">
-                      {person.name}
-                    </div>
-                  )}
-                </div>
-                <p className="mt-2 truncate text-sm font-medium">{person.name}</p>
-                {person.character && (
-                  <p className="truncate text-xs text-dim">{person.character}</p>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <CastRail cast={item.cast} className="px-5 py-12 sm:px-8 lg:px-14" />
 
       {isSeries && <EpisodeList contentId={contentId(item)} seasons={item.seasons} />}
 

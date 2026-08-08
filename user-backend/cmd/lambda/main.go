@@ -29,6 +29,9 @@ func init() {
 	if err := controllers.EnsureSocialIndexes(context.Background()); err != nil {
 		log.Printf("Could not ensure social indexes: %v", err)
 	}
+	if err := controllers.EnsureCommentIndexes(context.Background()); err != nil {
+		log.Printf("Could not ensure comment indexes: %v", err)
+	}
 
 	// Shared with the local server, so this entrypoint cannot drift out of sync
 	// on middleware again — it previously shipped with no CORS at all.
