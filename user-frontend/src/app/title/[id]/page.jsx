@@ -87,7 +87,7 @@ export default function TitlePage({ params }) {
     );
   }
 
-  const art = item.poster_url || item.thumbnail_url;
+  const art = item.backdrop_url || item.poster_url || item.thumbnail_url;
   const episodes = totalEpisodes(item);
   const isSeries = item.type === "series";
   const year = (item.release_date || item.releaseDate || "").slice(0, 4);
@@ -133,8 +133,8 @@ export default function TitlePage({ params }) {
         <div className="billboard-scrim absolute inset-0" />
 
         <div className="relative px-5 pb-14 pt-32 sm:px-8 sm:pb-16 sm:pt-40 lg:px-14 lg:pt-48">
-          <div className="max-w-2xl">
-            <h1 className="font-display text-[clamp(2.25rem,6vw,4.25rem)] leading-[0.94]">
+          <div className="max-w-4xl">
+            <h1 className="font-display w-full text-[clamp(2.25rem,6vw,4.25rem)] leading-[0.94]">
               {item.title}
             </h1>
 

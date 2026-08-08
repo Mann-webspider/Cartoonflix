@@ -6,7 +6,7 @@
  * back to bundled sample data so the app still renders with no backend running.
  */
 
-const API = process.env.NEXT_PUBLIC_API_URL; // https://<id>.execute-api.<region>.amazonaws.com/api/v1
+import { API_BASE as API } from "./config.js";
 
 const TOKEN_KEY = "cf_token";
 

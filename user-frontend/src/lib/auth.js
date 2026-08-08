@@ -5,7 +5,7 @@
  * API only runs on the operator's own machine and is unreachable from here.
  */
 
-const API = process.env.NEXT_PUBLIC_API_URL;
+import { API_BASE as API } from "./config.js";
 
 const TOKEN_KEY = "cf_token";
 const USER_KEY = "cf_user";

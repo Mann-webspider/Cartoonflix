@@ -52,8 +52,8 @@ export default function Billboard({ item }) {
       <div className="billboard-scrim absolute inset-0" />
 
       <div className="relative flex min-h-[82vh] flex-col justify-end px-5 pb-16 pt-28 sm:min-h-[88vh] sm:px-8 sm:pb-20 lg:px-14 lg:pb-24">
-        <div className="max-w-2xl animate-rise">
-          <h1 className="text-[clamp(2.75rem,7.5vw,5.5rem)] leading-[0.88]">{item.title}</h1>
+        <div className="max-w-5xl  animate-rise">
+          <h1 className="text-[clamp(2.75rem,7.5vw,5.5rem)] w-full  leading-[0.88]">{item.title}</h1>
 
           {item.tagline && (
             <p className="mt-4 text-base text-dim sm:text-lg">{item.tagline}</p>
