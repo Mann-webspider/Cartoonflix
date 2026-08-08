@@ -15,8 +15,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"golang.org/x/crypto/bcrypt"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Viewer accounts live in the same `users` collection the admin API writes, so
@@ -138,6 +138,22 @@ func Signup(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"token": token, "user": publicUser(user)})
 }
 
+// invalidCredentials answers a failed sign-in.
+//
+// One message for both a missing account and a wrong password: telling them
+// apart lets anyone enumerate which emails are registered.
+//
+// It is a FUNCTION, not a value, and that is the whole point. Assigning
+// `invalid := c.Status(401).JSON(...)` to reuse it reads like building a
+// response, but Fiber's Status and JSON are side effects that fire the moment
+// the line runs — so every request got a 401 status and an error body before
+// the password was even checked. A successful login then replaced the body via
+// c.JSON and left the 401 behind, returning valid credentials under a failure
+// status. Keep this a call.
+func invalidCredentials(c *fiber.Ctx) error {
+	return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid credentials"})
+}
+
 // Login accepts either the username or the email in the `email` field, so the
 // viewer does not have to remember which one they signed up with.
 func Login(c *fiber.Ctx) error {
@@ -160,14 +176,11 @@ func Login(c *fiber.Ctx) error {
 		{"username": identity},
 	}}).Decode(&user)
 
-	// One message for both a missing account and a wrong password: telling them
-	// apart lets anyone enumerate which emails are registered.
-	invalid := c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid credentials"})
 	if err != nil {
-		return invalid
+		return invalidCredentials(c)
 	}
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(body.Password)) != nil {
-		return invalid
+		return invalidCredentials(c)
 	}
 
 	token, err := mintToken(user)

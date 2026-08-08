@@ -36,7 +36,13 @@ const authenticate = async (path, body) => {
     body: JSON.stringify(body),
   });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error || "Something went wrong. Try again.");
+
+  if (!res.ok) {
+    // Carry the status when the body has no message of its own. A bare
+    // "something went wrong" once hid a server returning 401 with a valid
+    // token in the payload, which read as a network fault for far too long.
+    throw new Error(json.error || `Sign-in failed (${res.status}).`);
+  }
 
   localStorage.setItem(TOKEN_KEY, json.token);
   localStorage.setItem(USER_KEY, JSON.stringify(json.user));
