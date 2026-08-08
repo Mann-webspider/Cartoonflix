@@ -1,19 +1,7 @@
-import { DataTableDemo } from "@/components/custom/dataTable";
-import { getMoviesMetadata } from "./actions";
+import ContentTable from "@/components/content/ContentTable";
 
-export default async function Page({params}:{params:{adminId:string}}) {
-    const movieData = await getMoviesMetadata()
-    
-    return (
-        
+export const metadata = { title: "Library · CartoonFlix admin" };
 
-
-        <div className=" bg-background text-foreground rounded col-span-10   ">
-            <div className="container">
-
-            <DataTableDemo data={movieData}/>
-            </div>
-            </div>
-        
-    );
+export default function AdminLibraryPage() {
+  return <ContentTable />;
 }

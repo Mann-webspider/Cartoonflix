@@ -1,12 +1,9 @@
-import { withNextVideo } from "next-video/process";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  env: {
-    BACKEND_URL: "http://localhost:5000",
-  },
-  images: {
-    domains: ["d1nb9xnp3todvf.cloudfront.net"],
-  },
+  reactStrictMode: true,
+  // Artwork comes from CloudFront (published posters) and TMDB (search
+  // results). Both are rendered with plain <img> in this internal tool, so no
+  // remote image loader configuration is needed.
 };
 
-export default withNextVideo(nextConfig);
+export default nextConfig;

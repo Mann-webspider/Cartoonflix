@@ -101,7 +101,15 @@ cd admin-backend && npm install && npm run dev
 cd frontend && npm install && npm run dev -- -p 3001
 ```
 
-Then open `http://localhost:3001/admin/new`, fill in the title, save the details, and use the media pipeline panel: choose a file, transcode, pick a poster from the extracted stills, publish.
+Then open `http://localhost:3001/admin/new`. One title moves through three tabs:
+
+1. **Details** — type the title, or press **Fill from TMDB** and pick the match. That fills the synopsis, genres, cast, directors, writers, studios, spoken languages, certification, runtime and artwork in one click. Save to create the title; Media and Preview unlock.
+2. **Media** — a film gets one ingest panel. A series gets seasons: add a season, **Pull episodes from TMDB** to list the whole run at once, then transcode episodes one at a time. Re-pulling a season refreshes titles and synopses but never touches an episode that has already been transcoded.
+3. **Preview** — the title rendered as viewers meet it, on the viewer's own dark billboard. Poster and card image can be replaced from here without re-running the pipeline.
+
+Metadata enrichment needs a free TMDB key in `admin-backend/.env` (`TMDB_API_KEY`). Without it everything still works — the **Fill from TMDB** button just reports that the key is missing, and fields are typed by hand.
+
+> TMDB rather than IMDb: IMDb publishes no public API and its terms forbid scraping. TMDB permits this use and carries the IMDb id, so titles can still be linked out.
 
 The same pipeline is available without the UI:
 

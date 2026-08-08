@@ -1,20 +1,7 @@
-import { DataTableDemo } from "@/components/custom/dataTable";
-import { getArchiveMovies } from "./actions";
+import ContentTable from "@/components/content/ContentTable";
 
-export default async function Page({params}:{params:{adminId:string}}) {
-    const movieData = await getArchiveMovies()
-   
-    
-    return (
-        
+export const metadata = { title: "Archive · CartoonFlix admin" };
 
-
-        <div className=" bg-background text-foreground rounded col-span-10   ">
-            <div className="container">
-
-            <DataTableDemo data={movieData.data}/>
-            </div>
-            </div>
-        
-    );
+export default function AdminArchivePage() {
+  return <ContentTable archived />;
 }
