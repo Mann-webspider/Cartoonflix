@@ -109,6 +109,8 @@ function Watch({ id }) {
           episode={episode}
           startAt={startAt}
           poster={currentEpisode?.thumbnail_url || item.poster_url}
+          // An episode carries its own tracks; a film's sit on the title.
+          subtitles={currentEpisode?.subtitles ?? item.subtitles ?? []}
         />
 
         <div className="py-8">

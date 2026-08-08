@@ -11,7 +11,9 @@
     "test": "node --test src/**/*.test.mjs"
   },
   "dependencies": {
+    "hls-video-element": "^1.5.11",
     "hls.js": "^1.5.17",
+    "media-chrome": "^4.19.2",
     "next": "15.1.11",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

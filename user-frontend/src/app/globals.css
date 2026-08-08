@@ -144,101 +144,57 @@ h3,
 }
 
 /*
-  Player scrubber. A real range input, restyled: the browser's default gives
-  keyboard stepping and screen-reader announcement, and both are easy to get
-  wrong when rebuilt from divs.
+  Media Chrome, wearing this design system rather than arriving with its own.
 
-  Amber marks how far through the title you are — the same job it does on the
-  continue-watching cards, and its only job anywhere.
+  The library owns the control bar, the captions and quality menus, PiP and
+  fullscreen — a large surface that is easy to build badly. What it must not
+  own is the look, so every one of its theme variables points at the same
+  tokens the rest of the app uses. Amber keeps its single meaning here too: it
+  marks how far through you are, and nothing else.
 */
-.scrubber {
-  --track: 4px;
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  cursor: pointer;
-  height: 18px;
+.cf-player {
+  --media-font-family: "Helvetica Now Text", ui-sans-serif, system-ui, sans-serif;
+  --media-primary-color: rgb(var(--text));
+  --media-secondary-color: transparent;
+  --media-text-color: rgb(var(--text));
+  --media-icon-color: rgb(var(--text));
+
+  /* The control bar sits on moving artwork, so it needs its own plate. */
+  --media-control-background: transparent;
+  --media-control-hover-background: rgb(var(--text) / 0.14);
+  --media-control-bar-display: flex;
+
+  /* Played is amber; buffered and remainder are tints of the foreground. */
+  --media-range-bar-color: rgb(var(--ember));
+  --media-range-track-color: rgb(var(--text) / 0.12);
+  --media-range-track-progress-internal-color: rgb(var(--text) / 0.3);
+  --media-range-thumb-background: rgb(var(--text));
+  --media-range-track-height: 4px;
+  --media-range-thumb-height: 13px;
+  --media-range-thumb-width: 13px;
+
+  --media-menu-background: rgb(var(--surface));
+  --media-menu-item-checked-indicator-display: block;
+  --media-menu-border: 1px solid var(--line);
+  --media-menu-border-radius: var(--radius);
+  --media-menu-item-hover-background: rgb(var(--text) / 0.08);
+
+  --media-tooltip-background: rgb(var(--surface-2));
+  --media-tooltip-border: 1px solid var(--line);
+
+  --media-preview-time-text-shadow: none;
 }
 
-.scrubber::-webkit-slider-runnable-track {
-  height: var(--track);
-  border-radius: 999px;
-  background: linear-gradient(
-    to right,
-    rgb(var(--ember)) var(--played),
-    rgb(var(--text) / 0.3) var(--played) var(--buffered),
-    rgb(var(--text) / 0.12) var(--buffered)
-  );
-  transition: height 160ms var(--ease);
+.cf-player::part(top),
+.cf-player media-control-bar {
+  background: linear-gradient(to top, rgb(var(--ink)) 0%, rgb(var(--ink) / 0.72) 55%, transparent 100%);
+  padding: 2.5rem 0.5rem 0.35rem;
 }
 
-.scrubber::-moz-range-track {
-  height: var(--track);
-  border-radius: 999px;
-  background: linear-gradient(
-    to right,
-    rgb(var(--ember)) var(--played),
-    rgb(var(--text) / 0.3) var(--played) var(--buffered),
-    rgb(var(--text) / 0.12) var(--buffered)
-  );
-}
-
-/* The head stays out of the way until the viewer reaches for it. */
-.scrubber::-webkit-slider-thumb {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 13px;
-  height: 13px;
-  margin-top: calc((var(--track) - 13px) / 2);
-  border-radius: 999px;
-  background: rgb(var(--text));
-  opacity: 0;
-  transition:
-    opacity 160ms var(--ease),
-    transform 160ms var(--ease);
-}
-
-.scrubber::-moz-range-thumb {
-  width: 13px;
-  height: 13px;
-  border: 0;
-  border-radius: 999px;
-  background: rgb(var(--text));
-  opacity: 0;
-  transition: opacity 160ms var(--ease);
-}
-
-/*
-  Volume is not progress, so it must not borrow amber — that colour answers
-  exactly one question on this surface, and it is "how far through are you".
-*/
-.scrubber--volume::-webkit-slider-runnable-track {
-  background: linear-gradient(
-    to right,
-    rgb(var(--text)) var(--played),
-    rgb(var(--text) / 0.2) var(--played)
-  );
-}
-.scrubber--volume::-moz-range-track {
-  background: linear-gradient(
-    to right,
-    rgb(var(--text)) var(--played),
-    rgb(var(--text) / 0.2) var(--played)
-  );
-}
-
-.scrubber:hover,
-.scrubber:focus-visible {
-  --track: 6px;
-}
-
-.scrubber:hover::-webkit-slider-thumb,
-.scrubber:focus-visible::-webkit-slider-thumb {
-  opacity: 1;
-}
-.scrubber:hover::-moz-range-thumb,
-.scrubber:focus-visible::-moz-range-thumb {
-  opacity: 1;
+/* The chosen quality and caption track read as chosen, not decorative. */
+.cf-player [role="menuitemradio"][aria-checked="true"],
+.cf-player [aria-checked="true"] {
+  color: rgb(var(--brand-bright));
 }
 
 /* Loading placeholders breathe rather than blink. */
