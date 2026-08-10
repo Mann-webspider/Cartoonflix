@@ -4,8 +4,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { s3 } from "./lib/s3.js";
 import { uploadDir, contentTypeFor } from "./s3/upload.js";
 import { jobDir, readManifest, MEDIA_ROOT } from "./pipeline.js";
-
-const cdnUrl = (domain, key) => `https://${domain}/${key}`;
+import { cdnUrl } from "./lib/cdn.js";
 
 /**
  * Push a completed local job to S3 and return the URLs the database should

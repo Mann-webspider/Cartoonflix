@@ -5,6 +5,7 @@ import { downloadFromS3 } from "./s3/download.js";
 import { uploadDir } from "./s3/upload.js";
 import { probe } from "./transcode/probe.js";
 import { transcodeToHLS } from "./transcode/hls.js";
+import { cdnUrl } from "./lib/cdn.js";
 
 /**
  * Run one transcode job end to end: download raw -> HLS -> upload.
@@ -37,7 +38,7 @@ export const run = async (job) => {
     await uploadDir(hlsBucket, outDir, contentId);
 
     const videoUrl = cloudfrontDomain
-      ? `https://${cloudfrontDomain}/${contentId}/master.m3u8`
+      ? cdnUrl(cloudfrontDomain, `${contentId}/master.m3u8`)
       : `${contentId}/master.m3u8`;
     console.log("Transcode job done:", videoUrl);
     return { videoUrl, prefix: contentId };

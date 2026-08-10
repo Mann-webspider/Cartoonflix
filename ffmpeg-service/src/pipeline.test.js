@@ -11,6 +11,7 @@ import {
 import { samplePoints } from "./transcode/thumbnails.js";
 import { normaliseLanguage, trackLabel } from "./transcode/probe.js";
 import { extractSubtitles } from "./transcode/subtitles.js";
+import { cdnUrl } from "./lib/cdn.js";
 
 test("slugFor keys movies flat and episodes under their series", () => {
   assert.equal(slugFor({ contentId: "abc" }), "abc");
@@ -84,6 +85,22 @@ test("trackLabel prefers the embedded title, then the language", () => {
   assert.equal(trackLabel({ language: "eng", forced: true, index: 0 }), "English (forced)");
   // No tag at all still produces a distinguishable menu entry.
   assert.equal(trackLabel({ index: 2 }), "Track 3");
+});
+
+test("cdnUrl tolerates a CloudFront domain that already carries a scheme", () => {
+  // The AWS console shows the distribution with https:// on the front, so that
+  // is what gets pasted into an environment file. Prefixing a second one
+  // produced https://https://…, which no player fetches — and because the URL
+  // is written to the database on a successful upload, the failure only
+  // surfaced later, at playback, on a title that reported success.
+  const expected = "https://d1nb9xnp3todvf.cloudfront.net/movie/1/master.m3u8";
+  const key = "movie/1/master.m3u8";
+
+  assert.equal(cdnUrl("d1nb9xnp3todvf.cloudfront.net", key), expected);
+  assert.equal(cdnUrl("https://d1nb9xnp3todvf.cloudfront.net", key), expected);
+  assert.equal(cdnUrl("http://d1nb9xnp3todvf.cloudfront.net", key), expected);
+  assert.equal(cdnUrl("https://d1nb9xnp3todvf.cloudfront.net/", key), expected);
+  assert.equal(cdnUrl("  https://d1nb9xnp3todvf.cloudfront.net  ", key), expected);
 });
 
 test("buildStreamArgs keeps every audio language as a selectable rendition", () => {
