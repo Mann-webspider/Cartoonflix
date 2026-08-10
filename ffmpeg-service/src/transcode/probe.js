@@ -92,8 +92,8 @@ export const normaliseLanguage = (raw) => {
   return { code: short, name: LANGUAGE_NAMES[short] || raw };
 };
 
-/** Build the label a viewer reads in the captions menu. */
-export const subtitleLabel = ({ title, language, forced, index }) => {
+/** Build the label a viewer reads in the captions or audio menu. */
+export const trackLabel = ({ title, language, forced, index }) => {
   if (title) return title;
   const { name } = normaliseLanguage(language);
   const base = name === "Unknown" ? `Track ${index + 1}` : name;
@@ -103,10 +103,10 @@ export const subtitleLabel = ({ title, language, forced, index }) => {
 /**
  * Read the source properties the pipeline branches on: duration drives
  * thumbnail spacing, height caps the rendition ladder, fps sets the GOP size,
- * a missing audio stream changes the ffmpeg stream mapping, and embedded
- * subtitle streams become WebVTT tracks.
+ * every audio stream becomes a selectable dub, and embedded subtitle streams
+ * become WebVTT tracks.
  *
- * @returns {Promise<{durationSec: number, width: number, height: number, fps: number, hasAudio: boolean, subtitles: object[]}>}
+ * @returns {Promise<{durationSec: number, width: number, height: number, fps: number, hasAudio: boolean, audio: object[], subtitles: object[]}>}
  */
 export const probe = async (input) => {
   const { stdout } = await execFileAsync(FFPROBE_PATH, [
@@ -149,7 +149,25 @@ export const probe = async (input) => {
         forced,
         default: stream.disposition?.default === 1,
         ...normaliseLanguage(language),
-        label: subtitleLabel({ title: stream.tags?.title, language, forced, index }),
+        label: trackLabel({ title: stream.tags?.title, language, forced, index }),
+      };
+    });
+
+  // Every audio stream, not just the first. A dual-audio release carries the
+  // original and the dub, and picking one at random here is how a Hindi viewer
+  // ends up with a Japanese-only stream and no way back — the choice belongs
+  // to whoever is watching. Positions are within the audio-only namespace,
+  // which is what `-map 0:a:N` counts.
+  const audio = streams
+    .filter((stream) => stream.codec_type === "audio")
+    .map((stream, index) => {
+      const language = stream.tags?.language;
+      return {
+        index,
+        codec: stream.codec_name,
+        default: stream.disposition?.default === 1,
+        ...normaliseLanguage(language),
+        label: trackLabel({ title: stream.tags?.title, language, index }),
       };
     });
 
@@ -158,7 +176,8 @@ export const probe = async (input) => {
     width: video.width,
     height: video.height,
     fps: parseRate(video.avg_frame_rate) || parseRate(video.r_frame_rate) || 25,
-    hasAudio: streams.some((s) => s.codec_type === "audio"),
+    hasAudio: audio.length > 0,
+    audio,
     subtitles,
   };
 };

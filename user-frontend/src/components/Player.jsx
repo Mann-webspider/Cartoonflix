@@ -18,6 +18,8 @@ import {
   MediaLoadingIndicator,
 } from "media-chrome/react";
 import {
+  MediaAudioTrackMenu,
+  MediaAudioTrackMenuButton,
   MediaCaptionsMenu,
   MediaCaptionsMenuButton,
   MediaRenditionMenu,
@@ -36,9 +38,10 @@ const localKey = (id, season, episode) =>
 /**
  * Adaptive-bitrate playback.
  *
- * Media Chrome supplies the control bar, the captions and quality menus,
- * picture-in-picture and fullscreen; `hls-video-element` wraps hls.js and is
- * what exposes the HLS renditions and embedded text tracks to those menus.
+ * Media Chrome supplies the control bar, the captions, audio and quality
+ * menus, picture-in-picture and fullscreen; `hls-video-element` wraps hls.js
+ * and is what exposes the HLS renditions, the alternate audio languages and
+ * the embedded text tracks to those menus.
  * Both are plain custom elements, so the chrome takes this project's design
  * tokens directly instead of arriving with a theme to fight.
  *
@@ -149,8 +152,12 @@ export default function Player({
       {poster && <MediaPosterImage slot="poster" src={poster} />}
       <MediaLoadingIndicator slot="centered-chrome" noautohide />
 
-      {/* Menus are anchored to their buttons and hidden until opened. */}
+      {/* Menus are anchored to their buttons and hidden until opened. The
+          audio menu populates itself from the EXT-X-MEDIA entries in
+          master.m3u8, and both it and its button stay hidden on a title with
+          only one dub — nothing here needs to know the languages up front. */}
       <MediaCaptionsMenu hidden anchor="auto" />
+      <MediaAudioTrackMenu hidden anchor="auto" />
       <MediaRenditionMenu hidden anchor="auto" />
 
       <MediaControlBar>
@@ -161,6 +168,7 @@ export default function Player({
         <MediaTimeDisplay showduration />
         <MediaMuteButton />
         <MediaVolumeRange />
+        <MediaAudioTrackMenuButton />
         <MediaCaptionsMenuButton />
         <MediaRenditionMenuButton />
         <MediaPipButton />

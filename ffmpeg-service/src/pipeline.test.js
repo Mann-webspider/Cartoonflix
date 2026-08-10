@@ -1,9 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { slugFor } from "./pipeline.js";
-import { ladderFor, LADDER, ffmpegPath } from "./transcode/hls.js";
+import {
+  ladderFor,
+  LADDER,
+  ffmpegPath,
+  buildStreamArgs,
+  labelAudioRenditions,
+} from "./transcode/hls.js";
 import { samplePoints } from "./transcode/thumbnails.js";
-import { normaliseLanguage, subtitleLabel } from "./transcode/probe.js";
+import { normaliseLanguage, trackLabel } from "./transcode/probe.js";
 import { extractSubtitles } from "./transcode/subtitles.js";
 
 test("slugFor keys movies flat and episodes under their series", () => {
@@ -72,12 +78,106 @@ test("normaliseLanguage maps container tags to what HTML wants", () => {
   assert.equal(normaliseLanguage("swe").code, "sw");
 });
 
-test("subtitleLabel prefers the embedded title, then the language", () => {
-  assert.equal(subtitleLabel({ title: "Signs & Songs", language: "eng", index: 0 }), "Signs & Songs");
-  assert.equal(subtitleLabel({ language: "eng", index: 0 }), "English");
-  assert.equal(subtitleLabel({ language: "eng", forced: true, index: 0 }), "English (forced)");
+test("trackLabel prefers the embedded title, then the language", () => {
+  assert.equal(trackLabel({ title: "Signs & Songs", language: "eng", index: 0 }), "Signs & Songs");
+  assert.equal(trackLabel({ language: "eng", index: 0 }), "English");
+  assert.equal(trackLabel({ language: "eng", forced: true, index: 0 }), "English (forced)");
   // No tag at all still produces a distinguishable menu entry.
-  assert.equal(subtitleLabel({ index: 2 }), "Track 3");
+  assert.equal(trackLabel({ index: 2 }), "Track 3");
+});
+
+test("buildStreamArgs keeps every audio language as a selectable rendition", () => {
+  const renditions = ladderFor(1080);
+  const audio = [
+    { index: 0, code: "ja", name: "Japanese", label: "Japanese", default: false },
+    { index: 1, code: "hi", name: "Hindi", label: "Hindi", default: true },
+  ];
+
+  const { maps, streamMap } = buildStreamArgs(renditions, audio, 48);
+
+  // The bug this replaces: a hardcoded `-map a:0` muxed the first track into
+  // every rung and discarded the second language entirely, so a dual-audio
+  // release played Japanese-only with no way to switch.
+  assert.deepEqual(
+    maps.filter((arg) => arg.startsWith("0:a:")),
+    ["0:a:0", "0:a:1"]
+  );
+
+  const variants = streamMap.split(" ");
+  assert.equal(variants.length, renditions.length + audio.length);
+
+  // Every variant has to join the group, or the master playlist never links
+  // the video rungs to the alternate audio and the menu stays empty.
+  assert.ok(
+    variants.every((variant) => variant.includes("agroup:audio")),
+    streamMap
+  );
+
+  // The source's own default wins. Nothing here may prefer a language: the
+  // same pipeline ingests Japanese-first and Hindi-first releases.
+  assert.deepEqual(
+    variants.filter((variant) => variant.includes("default:yes")),
+    ["a:1,agroup:audio,name:Hindi,language:hi,default:yes"]
+  );
+
+  // Names double as output directory names, so a collision would have one
+  // track's segments overwrite another's.
+  const names = variants.map((variant) => variant.match(/name:([^,]+)/)[1]);
+  assert.equal(new Set(names).size, names.length, `duplicate variant name in ${streamMap}`);
+});
+
+test("labelAudioRenditions replaces ffmpeg's placeholder names", () => {
+  // Verbatim ffmpeg output. NAME is hardcoded to audio_<n> by the muxer, and it
+  // is the string a player shows in its language menu — "audio_1" tells a
+  // viewer nothing about which track is Hindi.
+  const master = [
+    "#EXTM3U",
+    "#EXT-X-VERSION:6",
+    '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="group_audio",NAME="audio_1",DEFAULT=NO,LANGUAGE="ja",URI="Japanese/playlist.m3u8"',
+    '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="group_audio",NAME="audio_2",DEFAULT=YES,LANGUAGE="hi",URI="Hindi/playlist.m3u8"',
+    '#EXT-X-STREAM-INF:BANDWIDTH=1680800,RESOLUTION=854x480,CODECS="avc1.64001e,mp4a.40.2",AUDIO="group_audio"',
+    "480p/playlist.m3u8",
+  ].join("\n");
+
+  const result = labelAudioRenditions(
+    master,
+    new Map([
+      ["Japanese/playlist.m3u8", 'Japanese "original"'],
+      ["Hindi/playlist.m3u8", "Hindi"],
+    ])
+  );
+
+  // A quote in the label would close the attribute early and corrupt the line.
+  assert.ok(result.includes('NAME="Japanese original"'), result);
+  assert.ok(result.includes('NAME="Hindi"'), result);
+  assert.ok(!result.includes("audio_1"), "placeholder left behind");
+  assert.ok(!result.includes("audio_2"), "placeholder left behind");
+
+  // Everything else on those lines, and the variant lines, are untouched.
+  assert.ok(result.includes('DEFAULT=YES,LANGUAGE="hi"'));
+  assert.equal(result.split("\n").length, master.split("\n").length);
+  assert.ok(result.includes('CODECS="avc1.64001e,mp4a.40.2",AUDIO="group_audio"'));
+});
+
+test("buildStreamArgs omits the audio group when the source is silent", () => {
+  // An agroup pointing at no audio rendition makes the master playlist invalid.
+  const { maps, streamMap } = buildStreamArgs(ladderFor(720), [], 48);
+  assert.ok(!streamMap.includes("agroup"), streamMap);
+  assert.ok(!maps.some((arg) => arg.startsWith("0:a:")));
+});
+
+test("buildStreamArgs distinguishes two tracks sharing one language", () => {
+  const { streamMap } = buildStreamArgs(
+    ladderFor(480),
+    [
+      { index: 0, code: "ja", name: "Japanese", label: "Japanese", default: true },
+      { index: 1, code: "ja", name: "Japanese", label: "Commentary", default: false },
+    ],
+    48
+  );
+
+  assert.ok(streamMap.includes("name:Japanese,"), streamMap);
+  assert.ok(streamMap.includes("name:Japanese-2,"), streamMap);
 });
 
 test("extractSubtitles skips bitmap tracks instead of failing the ingest", async () => {

@@ -157,6 +157,21 @@ h3,
   --media-preview-time-text-shadow: none;
 }
 
+/*
+  Media Chrome marks a control unavailable but leaves the hiding to us. Without
+  this, a film with one audio track still shows an audio button that opens an
+  empty menu, and a title that never finished transcoding shows a quality
+  button with nothing to choose. A control that does nothing is worse than an
+  absent one: the viewer has to click it to learn that.
+*/
+.cf-player [mediaaudiotrackunavailable],
+.cf-player [mediarenditionunavailable],
+.cf-player [mediapipunavailable],
+.cf-player [mediafullscreenunavailable],
+.cf-player [mediavolumeunavailable] {
+  display: none;
+}
+
 .cf-player media-control-bar {
   background: linear-gradient(
     to top,

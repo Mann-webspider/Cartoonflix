@@ -84,7 +84,12 @@ export interface IngestJob {
     subtitles?: { file: string; language: string; label: string; source: string }[];
     // Bitmap tracks the pipeline could not convert, with the reason.
     skippedSubtitles?: { codec: string; label: string; reason: string }[];
-    hls: { renditions: string[]; segmentSeconds: number };
+    // audio is absent on manifests written before dubs were kept separately.
+    hls: {
+      renditions: string[];
+      segmentSeconds: number;
+      audio?: { language: string; label: string }[];
+    };
     source: { durationSec: number; width: number; height: number };
   } | null;
 }

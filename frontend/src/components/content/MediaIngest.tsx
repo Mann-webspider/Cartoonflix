@@ -337,6 +337,12 @@ export default function MediaIngest({ contentId, season, episode, onPublished }:
                 {job.manifest.hls.renditions.join(" · ")} ·{" "}
                 {job.manifest.hls.segmentSeconds}s segments ·{" "}
                 {job.manifest.source.width}×{job.manifest.source.height}
+                {/* Which dubs survived the ingest. Worth showing before the
+                    upload: a dual-audio source that came out with one language
+                    is the moment to re-run it, not after it is live. */}
+                {job.manifest.hls.audio?.length
+                  ? ` · audio: ${job.manifest.hls.audio.map((track) => track.label).join(", ")}`
+                  : null}
               </span>
             )}
           </div>

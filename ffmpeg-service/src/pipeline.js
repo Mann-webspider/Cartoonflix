@@ -101,6 +101,10 @@ export const ingest = async ({
     hls: {
       master: "hls/master.m3u8",
       renditions: hls.renditions,
+      // Which dubs a viewer can pick between. Declared inside master.m3u8, so
+      // this copy is for the admin to check the ingest kept both, not for the
+      // player to read.
+      audio: hls.audio,
       segmentSeconds: hls.segmentSeconds,
     },
     thumbnails,
