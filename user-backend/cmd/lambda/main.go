@@ -38,8 +38,9 @@ func init() {
 	fiberLambda = fiberadapter.New(app.New())
 }
 
-// API Gateway HTTP API (payload format 2.0).
+// API Gateway HTTP API (payload format 2.0) — and Function URLs, same shape.
 func handler(ctx context.Context, req events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	req.RequestContext.HTTP.SourceIP = app.NormaliseSourceIP(req.RequestContext.HTTP.SourceIP)
 	return fiberLambda.ProxyWithContextV2(ctx, req)
 }
 

@@ -28,6 +28,25 @@ func AllowedOrigins() string {
 	return defaultOrigins
 }
 
+// NormaliseSourceIP makes an IPv6 caller survive the Lambda proxy adapter.
+//
+// The adapter builds fasthttp's RemoteAddr from the event's SourceIP and
+// appends ":80" — but only when the string contains no colon, a test that
+// quietly assumes IPv4. An IPv6 address is nothing but colons, so it is passed
+// through raw, net.ResolveTCPAddr rejects it ("too many colons in address")
+// and the adapter answers 500 before the request reaches a single route.
+//
+// That is an outage that hides from you: viewers on an IPv6 network get 500 on
+// every endpoint while IPv4 viewers, and any IPv4 health check, see a healthy
+// API. Bracketing the host is what the adapter would do if it knew about IPv6,
+// and it preserves the real client address instead of discarding it.
+func NormaliseSourceIP(ip string) string {
+	if !strings.Contains(ip, ":") || strings.HasPrefix(ip, "[") {
+		return ip
+	}
+	return "[" + ip + "]:80"
+}
+
 // New builds the API with its middleware and routes.
 //
 // Both entrypoints — the local server and the Lambda — go through here, because

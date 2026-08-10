@@ -1,10 +1,48 @@
 package app
 
 import (
+	"net"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
+
+// The proxy adapter's own rule, reproduced here so this test fails if our
+// normalisation ever stops satisfying it. Mirrors the ":80" branch in
+// aws-lambda-go-api-proxy/fiber/adapter.go.
+func adapterRemoteAddr(sourceIP string) string {
+	if !strings.Contains(sourceIP, ":") {
+		return sourceIP + ":80"
+	}
+	return sourceIP
+}
+
+// The outage this guards: the adapter fed a bare IPv6 source address to
+// net.ResolveTCPAddr, which rejected it, so every endpoint returned 500 for
+// viewers on an IPv6 network — while IPv4 clients, and any IPv4 health check,
+// saw a perfectly healthy API.
+func TestNormaliseSourceIPSurvivesTheAdapter(t *testing.T) {
+	for _, ip := range []string{
+		"2409:4080:8d0a:e6b2:f84d:a20b:1f5c:126e", // the address that took the API down
+		"2001:db8::1",
+		"::1",
+		"49.36.180.22",
+	} {
+		normalised := NormaliseSourceIP(ip)
+
+		addr, err := net.ResolveTCPAddr("tcp", adapterRemoteAddr(normalised))
+		if err != nil {
+			t.Errorf("source IP %s: %v — every request from this client would 500", ip, err)
+			continue
+		}
+		if got, want := addr.IP.String(), net.ParseIP(ip).String(); got != want {
+			t.Errorf("source IP %s resolved to %s; the real client address must survive", ip, got)
+		}
+		if again := NormaliseSourceIP(normalised); again != normalised {
+			t.Errorf("NormaliseSourceIP(%q) = %q on a second pass; it must be idempotent", normalised, again)
+		}
+	}
+}
 
 // The default is deliberately permissive so a fresh deploy answers before
 // anyone has configured anything. What must never happen again is an empty or
