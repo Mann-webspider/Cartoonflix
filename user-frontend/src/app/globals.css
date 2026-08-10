@@ -116,6 +116,29 @@ h3,
   border-radius: 4px;
 }
 
+/*
+  Television. On a remote there is no cursor, so this box IS the cursor — it is
+  the only way to know what OK will press. Heavier than the desktop ring and
+  bound to :focus rather than :focus-visible, because every move on a remote is
+  a focus move and the box must never be the thing the browser decides to omit.
+
+  Sized to be legible from a sofa, and shadowed so it survives being drawn over
+  artwork that happens to be the same near-white as the outline.
+*/
+html.tv :where(a, button, input, select, textarea, [tabindex]):focus {
+  outline: 3px solid rgb(var(--text));
+  outline-offset: 4px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 7px rgb(var(--ink) / 0.75);
+}
+
+/* The player fills its frame, so its box has to sit inside the picture rather
+   than outside where it would be clipped. */
+html.tv media-controller:focus {
+  outline-offset: -5px;
+  box-shadow: none;
+}
+
 /* Durations and episode counts sit in columns; proportional digits make them
    jitter as they change. */
 .tabular {

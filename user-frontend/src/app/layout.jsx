@@ -1,5 +1,6 @@
 import "./globals.css";
 import Header from "@/components/Header";
+import TvNavigation from "@/components/TvNavigation";
 import { SessionProvider } from "@/components/SessionProvider";
 
 export const metadata = {
@@ -51,6 +52,9 @@ export default function RootLayout({ children }) {
       </head>
       <body className="min-h-screen bg-ink text-text antialiased">
         <div hidden dangerouslySetInnerHTML={{ __html: DIRECTION_CONTRACT }} />
+        {/* Renders nothing. Installs D-pad navigation when the device turns out
+            to be a television, and stays out of the way otherwise. */}
+        <TvNavigation />
         <SessionProvider>
           {/* The header is nine tab stops deep and fixed on every route; without
               this, keyboard users cross it again after each navigation. */}

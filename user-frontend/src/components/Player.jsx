@@ -27,10 +27,11 @@ import {
 } from "media-chrome/react/menu";
 
 import { saveProgress } from "@/lib/api";
+import { detectTv } from "@/lib/tv";
+import { SEEK_SECONDS } from "@/lib/playback";
 
 /** How often playback position is written back to the API. */
 const SYNC_INTERVAL_MS = 15000;
-const SEEK_SECONDS = 10;
 
 const localKey = (id, season, episode) =>
   `cf_pos_${id}${season && episode ? `_s${season}e${episode}` : ""}`;
@@ -62,9 +63,27 @@ export default function Player({
   subtitles = [],
 }) {
   const videoRef = useRef(null);
+  const controllerRef = useRef(null);
   const lastSyncRef = useRef(0);
   const resumedRef = useRef(false);
   const storageKey = localKey(id, season, episode);
+
+  useEffect(() => {
+    const controller = controllerRef.current;
+    if (!controller || !src || !detectTv()) return;
+
+    // Hand all four arrows to the remote handler. Media Chrome calls
+    // preventDefault on them and seeks from anywhere inside the player, which
+    // means focus can enter the control bar and then never leave it — the
+    // arrows scrub the video instead of stepping between buttons. Seeking and
+    // volume are reimplemented there for the one case that wants them, the
+    // picture itself; on a television the volume is the television's job.
+    controller.setAttribute("hotkeys", "noarrowleft noarrowright noarrowup noarrowdown");
+
+    // Start on the picture, so the first press of left or right scrubs instead
+    // of hunting for something to select.
+    controller.focus({ preventScroll: true });
+  }, [src]);
 
   const sync = useCallback(
     (position, duration, force = false) => {
@@ -124,7 +143,15 @@ export default function Player({
   }
 
   return (
-    <MediaController className="cf-player w-full overflow-hidden rounded bg-black">
+    <MediaController
+      ref={controllerRef}
+      // Focusable so a remote can land on the picture itself — that is what
+      // makes seek-by-arrow and OK-to-pause reachable without a cursor. It also
+      // gives Media Chrome's own hotkeys somewhere to fire from on a desktop,
+      // where until now they only worked once a control had been clicked.
+      tabIndex={0}
+      className="cf-player w-full overflow-hidden rounded bg-black"
+    >
       <HlsVideo
         ref={videoRef}
         slot="media"
