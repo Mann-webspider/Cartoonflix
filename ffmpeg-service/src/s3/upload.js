@@ -38,13 +38,31 @@ export const uploadDir = async (bucket, dir, prefix, concurrency = 8) => {
   console.log(`Uploaded ${jobs.length} files to s3://${bucket}/${prefix}`);
 };
 
+/**
+ * Upload one file, retrying transient failures.
+ *
+ * The body is read into a buffer rather than streamed, which matters more than
+ * it looks. A stream can only be consumed once, and the SDK retries internally
+ * before this function ever sees a failure — on that retry it re-sends a stream
+ * that is already at its end, so no bytes go out, and S3 eventually closes the
+ * connection with "your socket connection to the server was not read from or
+ * written to within the timeout period". The error names a socket and blames
+ * the network for what is really an exhausted stream.
+ *
+ * A buffer is re-sendable and carries its own length, so both the SDK's retries
+ * and the loop below actually work. Safe here because this only ever uploads
+ * playlists, stills and HLS segments — a ten-second 1080p segment is a few
+ * megabytes, and the multi-gigabyte source file is never sent at all.
+ */
 const putWithRetry = async (bucket, key, filePath, retries = 3) => {
+  const body = fs.readFileSync(filePath);
+
   for (let attempt = 1; ; attempt++) {
     try {
       await s3.send(new PutObjectCommand({
         Bucket: bucket,
         Key: key,
-        Body: fs.createReadStream(filePath),
+        Body: body,
         ContentType: contentTypeFor(filePath),
       }));
       return;
