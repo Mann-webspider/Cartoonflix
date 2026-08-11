@@ -205,6 +205,101 @@ html.tv media-controller:focus {
   padding: 2.5rem 0.5rem 0.35rem;
 }
 
+/*
+  A settings row that leads nowhere is worse than a missing one — the viewer
+  has to open it to find that out. Media Chrome counts each submenu's entries
+  for us, so a film with one dub and no subtitles simply shows Quality and
+  Speed. One option is as dead an end as none: there is nothing to choose.
+*/
+.cf-player media-settings-menu-item[submenusize="0"],
+.cf-player media-settings-menu-item[submenusize="1"] {
+  display: none;
+}
+
+/*
+  Volume rises out of the mute button instead of sitting beside it. Absolutely
+  positioned, it takes no width in the row — which is what leaves room for the
+  skip buttons on a phone, where the bar previously ran off the screen and took
+  fullscreen with it.
+*/
+.cf-player .cf-volume {
+  position: relative;
+  display: inline-flex;
+}
+
+.cf-player .cf-volume-popup {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  margin-bottom: 0.35rem;
+  transform: translateX(-50%);
+  padding: 0.7rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgb(var(--surface));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease-out;
+}
+
+.cf-player .cf-volume:hover .cf-volume-popup,
+.cf-player .cf-volume:focus-within .cf-volume-popup {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/*
+  A real vertical range, not a rotated horizontal one: Media Chrome's own range
+  decides where a drag landed from clientX against the track's horizontal
+  bounds, so rotating it would look right and drag sideways. `direction: rtl`
+  puts loud at the top, which is the only way round anyone expects.
+*/
+.cf-volume-range {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 0.3rem;
+  height: 5.5rem;
+  accent-color: rgb(var(--text));
+  cursor: pointer;
+}
+
+/*
+  Touch has no hover, and the only way to reveal the slider would be to tap the
+  mute button — which mutes. Phones and televisions have their own volume keys,
+  so the button alone is the honest control there.
+*/
+@media (hover: none) {
+  .cf-player .cf-volume-popup {
+    display: none;
+  }
+}
+
+/*
+  Below this the row cannot hold the scrubber and seven controls, so the
+  scrubber takes a line of its own above them. It is the better shape on a
+  phone regardless — a full-width scrub target rather than a sliver between
+  buttons.
+*/
+@media (max-width: 40rem) {
+  .cf-player media-control-bar {
+    flex-wrap: wrap;
+    padding: 2rem 0.25rem 0.25rem;
+    /* Tighter than the desktop 10px: six controls and the clock have to sit on
+       one line at 375px, and at the default padding fullscreen wrapped onto a
+       row of its own. */
+    --media-control-padding: 0.4rem;
+  }
+
+  .cf-player media-time-range {
+    order: -1;
+    flex-basis: 100%;
+  }
+
+  .cf-player media-time-display {
+    font-size: 0.75rem;
+  }
+}
+
 /* Loading placeholders breathe rather than blink. */
 @keyframes skeleton {
   0%,

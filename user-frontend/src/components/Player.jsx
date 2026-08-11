@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import HlsVideo from "hls-video-element/react";
 import {
   MediaController,
@@ -11,19 +11,18 @@ import {
   MediaTimeRange,
   MediaTimeDisplay,
   MediaMuteButton,
-  MediaVolumeRange,
-  MediaPipButton,
   MediaFullscreenButton,
   MediaPosterImage,
   MediaLoadingIndicator,
 } from "media-chrome/react";
 import {
   MediaAudioTrackMenu,
-  MediaAudioTrackMenuButton,
   MediaCaptionsMenu,
-  MediaCaptionsMenuButton,
+  MediaPlaybackRateMenu,
   MediaRenditionMenu,
-  MediaRenditionMenuButton,
+  MediaSettingsMenu,
+  MediaSettingsMenuButton,
+  MediaSettingsMenuItem,
 } from "media-chrome/react/menu";
 
 import { saveProgress } from "@/lib/api";
@@ -35,6 +34,63 @@ const SYNC_INTERVAL_MS = 15000;
 
 const localKey = (id, season, episode) =>
   `cf_pos_${id}${season && episode ? `_s${season}e${episode}` : ""}`;
+
+/**
+ * Volume: a vertical slider that rises out of the mute button.
+ *
+ * Not Media Chrome's own range, which is horizontal and — the part that
+ * decides it — works out where a drag landed by comparing `clientX` against the
+ * track's horizontal bounds. Rotating that with CSS produces a control that
+ * looks vertical and still drags sideways. A native range in vertical writing
+ * mode is genuinely vertical, and the browser handles pointer, touch and
+ * keyboard without any of it being reimplemented here.
+ *
+ * It sits absolutely positioned above the button, so it occupies no width in
+ * the bar. That is the point: on a phone the row had run past the edge of the
+ * screen, taking the skip and fullscreen buttons with it.
+ */
+function VolumeControl({ videoRef }) {
+  const [{ volume, muted }, setLevel] = useState({ volume: 1, muted: false });
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Driven by the element, not by local state, so the mute button and the
+    // keyboard shortcut move this slider too.
+    const sync = () => setLevel({ volume: video.volume, muted: video.muted });
+    sync();
+    video.addEventListener("volumechange", sync);
+    return () => video.removeEventListener("volumechange", sync);
+  }, [videoRef]);
+
+  const change = (next) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.volume = next;
+    // Dragging to zero means mute; dragging away from it means unmute, or the
+    // slider would move while the sound stayed off.
+    video.muted = next === 0;
+  };
+
+  return (
+    <div className="cf-volume">
+      <MediaMuteButton />
+      <div className="cf-volume-popup">
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={muted ? 0 : volume}
+          onChange={(event) => change(Number(event.target.value))}
+          aria-label="Volume"
+          className="cf-volume-range"
+        />
+      </div>
+    </div>
+  );
+}
 
 /**
  * Adaptive-bitrate playback.
@@ -67,6 +123,23 @@ export default function Player({
   const lastSyncRef = useRef(0);
   const resumedRef = useRef(false);
   const storageKey = localKey(id, season, episode);
+
+  // Read after mount: on the server there is no document to ask, and a menu row
+  // that does nothing on the browsers without it is worse than no row.
+  const [pipSupported, setPipSupported] = useState(false);
+  useEffect(() => setPipSupported(Boolean(document.pictureInPictureEnabled)), []);
+
+  const togglePip = async () => {
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      if (document.pictureInPictureElement) await document.exitPictureInPicture();
+      else await video.requestPictureInPicture();
+    } catch {
+      // Refused by the browser — a gesture requirement, or another element
+      // already holds the window. Nothing here is worth an error over.
+    }
+  };
 
   useEffect(() => {
     const controller = controllerRef.current;
@@ -179,13 +252,33 @@ export default function Player({
       {poster && <MediaPosterImage slot="poster" src={poster} />}
       <MediaLoadingIndicator slot="centered-chrome" noautohide />
 
-      {/* Menus are anchored to their buttons and hidden until opened. The
-          audio menu populates itself from the EXT-X-MEDIA entries in
-          master.m3u8, and both it and its button stay hidden on a title with
-          only one dub — nothing here needs to know the languages up front. */}
-      <MediaCaptionsMenu hidden anchor="auto" />
-      <MediaAudioTrackMenu hidden anchor="auto" />
-      <MediaRenditionMenu hidden anchor="auto" />
+      {/* One menu behind one button, rather than four buttons in the bar. Each
+          submenu populates itself — quality from the playlist's variants, audio
+          from its EXT-X-MEDIA entries, subtitles from the text tracks — so a
+          title with a single dub simply shows nothing under Audio. */}
+      <MediaSettingsMenu hidden anchor="auto">
+        <MediaSettingsMenuItem>
+          Quality
+          <MediaRenditionMenu slot="submenu" hidden />
+        </MediaSettingsMenuItem>
+        <MediaSettingsMenuItem>
+          Audio
+          <MediaAudioTrackMenu slot="submenu" hidden />
+        </MediaSettingsMenuItem>
+        <MediaSettingsMenuItem>
+          Subtitles
+          <MediaCaptionsMenu slot="submenu" hidden />
+        </MediaSettingsMenuItem>
+        <MediaSettingsMenuItem>
+          Speed
+          <MediaPlaybackRateMenu slot="submenu" hidden />
+        </MediaSettingsMenuItem>
+        {/* A plain row rather than Media Chrome's icon-only PiP button, which
+            inside a menu would read as an unlabelled glyph among words. */}
+        {pipSupported && (
+          <MediaSettingsMenuItem onClick={togglePip}>Picture in picture</MediaSettingsMenuItem>
+        )}
+      </MediaSettingsMenu>
 
       <MediaControlBar>
         <MediaPlayButton />
@@ -193,12 +286,8 @@ export default function Player({
         <MediaSeekForwardButton seekoffset={SEEK_SECONDS} />
         <MediaTimeRange />
         <MediaTimeDisplay showduration />
-        <MediaMuteButton />
-        <MediaVolumeRange />
-        <MediaAudioTrackMenuButton />
-        <MediaCaptionsMenuButton />
-        <MediaRenditionMenuButton />
-        <MediaPipButton />
+        <VolumeControl videoRef={videoRef} />
+        <MediaSettingsMenuButton />
         <MediaFullscreenButton />
       </MediaControlBar>
     </MediaController>
