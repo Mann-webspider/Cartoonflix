@@ -195,14 +195,65 @@ html.tv media-controller:focus {
   display: none;
 }
 
-.cf-player media-control-bar {
+/*
+  Two stacked bars: the scrubber gets a full-width line of its own, the
+  controls sit below it. The scrub bar carries the gradient that lifts the
+  chrome off the picture and the button bar sits on that gradient's solid end,
+  so the pair reads as one panel.
+
+  Stacked rather than one bar told to wrap — a wrapped bar grew taller than the
+  strip Media Chrome reserves at the bottom and its second row was clipped
+  away, which is how a phone came to show a scrubber and nothing else.
+*/
+.cf-player media-control-bar.cf-bar-scrub {
   background: linear-gradient(
     to top,
     rgb(var(--ink)) 0%,
     rgb(var(--ink) / 0.72) 55%,
     transparent 100%
   );
-  padding: 2.5rem 0.5rem 0.35rem;
+  padding: 2.5rem 0.6rem 0;
+}
+
+.cf-player media-control-bar.cf-bar-buttons {
+  background: rgb(var(--ink));
+  padding: 0 0.4rem 0.3rem;
+}
+
+.cf-player media-time-range {
+  width: 100%;
+}
+
+/* Pushes volume, settings and fullscreen to the right of the row. */
+.cf-player .cf-spacer {
+  flex: 1;
+}
+
+/*
+  Play in the middle of the picture, sized for a thumb. A phone reaches the
+  centre of the screen far more easily than a 40px target in a corner, which is
+  why every mobile player puts it here.
+*/
+.cf-player .cf-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cf-player .cf-center media-play-button {
+  --media-button-icon-width: 30px;
+  --media-button-icon-height: 30px;
+  padding: 1rem;
+  border-radius: 999px;
+  background: rgb(var(--ink) / 0.55);
+  backdrop-filter: blur(3px);
+}
+
+/* A desktop expects play at the left of the bar, not floating over the film. */
+@media (min-width: 40.0625rem) {
+  .cf-player .cf-center {
+    display: none;
+  }
 }
 
 /*
@@ -275,24 +326,17 @@ html.tv media-controller:focus {
 }
 
 /*
-  Below this the row cannot hold the scrubber and seven controls, so the
-  scrubber takes a line of its own above them. It is the better shape on a
-  phone regardless — a full-width scrub target rather than a sliver between
-  buttons.
+  A phone has room for six controls on the row, not seven, and play is already
+  in the middle of the picture where a thumb can reach it. Padding tightens too:
+  at the desktop figure the last control wrapped onto a line of its own.
 */
 @media (max-width: 40rem) {
-  .cf-player media-control-bar {
-    flex-wrap: wrap;
-    padding: 2rem 0.25rem 0.25rem;
-    /* Tighter than the desktop 10px: six controls and the clock have to sit on
-       one line at 375px, and at the default padding fullscreen wrapped onto a
-       row of its own. */
+  .cf-player media-control-bar.cf-bar-buttons {
     --media-control-padding: 0.4rem;
   }
 
-  .cf-player media-time-range {
-    order: -1;
-    flex-basis: 100%;
+  .cf-player .cf-bar-buttons media-play-button {
+    display: none;
   }
 
   .cf-player media-time-display {

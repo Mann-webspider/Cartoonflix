@@ -280,12 +280,27 @@ export default function Player({
         )}
       </MediaSettingsMenu>
 
-      <MediaControlBar>
+      {/* Play sits in the middle of the picture, where a thumb reaches it
+          without crossing the screen. Hidden on a desktop, which expects it at
+          the left of the bar instead. */}
+      <div slot="centered-chrome" className="cf-center">
+        <MediaPlayButton />
+      </div>
+
+      {/* Two bars rather than one wrapped bar. A single bar told to wrap grew
+          taller than the strip Media Chrome reserves for it, and the second row
+          was clipped away — which is how a phone ended up showing a scrubber
+          and nothing else. Stacked bars are laid out by Media Chrome itself. */}
+      <MediaControlBar className="cf-bar-scrub">
+        <MediaTimeRange />
+      </MediaControlBar>
+
+      <MediaControlBar className="cf-bar-buttons">
         <MediaPlayButton />
         <MediaSeekBackwardButton seekoffset={SEEK_SECONDS} />
         <MediaSeekForwardButton seekoffset={SEEK_SECONDS} />
-        <MediaTimeRange />
         <MediaTimeDisplay showduration />
+        <span className="cf-spacer" />
         <VolumeControl videoRef={videoRef} />
         <MediaSettingsMenuButton />
         <MediaFullscreenButton />
