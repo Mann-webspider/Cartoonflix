@@ -36,7 +36,7 @@ const listJobs = () => [...jobs.values()];
  *
  * @returns {object} the job record, updated in place as the child reports
  */
-const startIngest = ({ slug, contentId, sourcePath, thumbnails, ladder }) => {
+const startIngest = ({ slug, contentId, sourcePath, thumbnails }) => {
   const existing = jobs.get(slug);
   if (existing?.status === "running") return existing;
 
@@ -59,9 +59,6 @@ const startIngest = ({ slug, contentId, sourcePath, thumbnails, ladder }) => {
     if (season) args.push("--season", season, "--episode", episode);
   }
   if (thumbnails) args.push("--thumbs", String(thumbnails));
-  // Passed as an argv entry rather than through a shell, so the JSON needs no
-  // quoting and cannot be re-parsed by a shell on the way.
-  if (ladder?.length) args.push("--ladder", JSON.stringify(ladder));
 
   const child = spawn(process.execPath, args, {
     cwd: FFMPEG_SERVICE_DIR,
@@ -170,19 +167,6 @@ const runPublish = ({ slug, contentId, poster, thumbnail }) => {
   return runCli(args);
 };
 
-/**
- * Predict the published size of a source at the given settings.
- *
- * Takes tens of seconds rather than milliseconds — it really does encode short
- * samples — so it is a deliberate button in the UI, not something that fires
- * while an operator drags a slider.
- */
-const runEstimate = ({ sourcePath, ladder }) => {
-  const args = ["src/cli.js", "estimate", "--source", sourcePath, "--json"];
-  if (ladder?.length) args.push("--ladder", JSON.stringify(ladder));
-  return runCli(args);
-};
-
 /** Convert an uploaded sidecar to WebVTT and record it on the job's manifest. */
 const runSubtitleConvert = ({ slug, contentId, filePath, language, label }) => {
   const args = appendEpisodeFlags(
@@ -200,7 +184,6 @@ module.exports = {
   getJob,
   listJobs,
   startIngest,
-  runEstimate,
   runPublish,
   runSubtitleConvert,
 };

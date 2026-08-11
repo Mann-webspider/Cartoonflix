@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import {
-  estimateIngest,
   getIngestStatus,
   publishIngest,
   startIngest,
@@ -16,10 +15,7 @@ import {
   uploadSource,
   uploadSubtitle,
   type IngestJob,
-  type LadderRung,
-  type SizeEstimate,
 } from "@/lib/api";
-import LadderControls from "./LadderControls";
 
 const POLL_MS = 1500;
 
@@ -49,11 +45,8 @@ export default function MediaIngest({ contentId, season, episode, onPublished }:
   const coordsKey = coords ? `${season}-${episode}` : "film";
 
   const [file, setFile] = useState<File | null>(null);
-  const [uploaded, setUploaded] = useState(false);
   const [uploadPercent, setUploadPercent] = useState(0);
-  const [estimate, setEstimate] = useState<SizeEstimate | null>(null);
-  const [ladder, setLadder] = useState<Partial<LadderRung>[]>([]);
-  const [busy, setBusy] = useState<"upload" | "publish" | "subtitle" | "estimate" | null>(null);
+  const [busy, setBusy] = useState<"upload" | "publish" | "subtitle" | null>(null);
   const [job, setJob] = useState<IngestJob | null>(null);
   const [poster, setPoster] = useState<string | null>(null);
   const [thumbnail, setThumbnail] = useState<string | null>(null);
@@ -82,9 +75,6 @@ export default function MediaIngest({ contentId, season, episode, onPublished }:
     setThumbnail(null);
     setUploadPercent(0);
     setFile(null);
-    setUploaded(false);
-    setEstimate(null);
-    setLadder([]);
   }, [coordsKey, contentId]);
 
   const refresh = useCallback(async () => {
@@ -109,51 +99,17 @@ export default function MediaIngest({ contentId, season, episode, onPublished }:
     return () => clearInterval(timer);
   }, [running]);
 
-  /**
-   * Upload is its own step now, because the quality controls need the file on
-   * disk before they can measure anything — the size prediction comes from
-   * encoding samples of the real source, not from arithmetic.
-   */
-  const upload = async () => {
+  const transcode = async () => {
     if (!file) return toast({ title: "Choose a video file first.", variant: "destructive" });
 
     setBusy("upload");
     setUploadPercent(0);
     try {
       await uploadSource(contentId, file, coords, setUploadPercent);
-      setUploaded(true);
-      setEstimate(null);
-      toast({ title: "Uploaded", description: "Check the encoding quality, then transcode." });
-    } catch (err) {
-      fail(err, "Upload failed");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const measure = async () => {
-    setBusy("estimate");
-    try {
-      const result = await estimateIngest(contentId, coords, ladder);
-      setEstimate(result);
-      // The measurement reports the settings it used, which is where the
-      // controls get their starting values — including any rung the ladder
-      // dropped because the source was too small to justify it.
-      setLadder(result.video.map(({ name, crf, maxrateK }) => ({ name, crf, maxrateK })));
-    } catch (err) {
-      fail(err, "Could not estimate the output size");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const transcode = async () => {
-    setBusy("upload");
-    try {
-      setJob(await startIngest(contentId, coords, undefined, ladder.length ? ladder : undefined));
+      setJob(await startIngest(contentId, coords));
       toast({ title: "Transcode started", description: "Progress appears below." });
     } catch (err) {
-      fail(err, "Could not start the transcode");
+      fail(err, "Upload failed");
     } finally {
       setBusy(null);
     }
@@ -212,7 +168,7 @@ export default function MediaIngest({ contentId, season, episode, onPublished }:
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             disabled={busy !== null || running}
           />
-          <Button type="button" onClick={upload} disabled={busy !== null || running || !file}>
+          <Button type="button" onClick={transcode} disabled={busy !== null || running || !file}>
             {busy === "upload" ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -221,7 +177,7 @@ export default function MediaIngest({ contentId, season, episode, onPublished }:
             ) : (
               <>
                 <UploadCloud className="mr-2 h-4 w-4" />
-                Upload
+                Transcode
               </>
             )}
           </Button>
@@ -230,22 +186,6 @@ export default function MediaIngest({ contentId, season, episode, onPublished }:
           Stays on this machine until you publish. Produces 480p, 720p and 1080p HLS.
         </p>
       </div>
-
-      {uploaded && !running && !transcoded && (
-        <>
-          <LadderControls
-            estimate={estimate}
-            ladder={ladder}
-            onLadderChange={setLadder}
-            onEstimate={measure}
-            busy={busy === "estimate"}
-            disabled={busy !== null}
-          />
-          <Button type="button" onClick={transcode} disabled={busy !== null}>
-            Start transcode
-          </Button>
-        </>
-      )}
 
       {busy === "upload" && <Progress value={uploadPercent} label="Uploading to this machine" />}
 
@@ -394,10 +334,7 @@ export default function MediaIngest({ contentId, season, episode, onPublished }:
             </Button>
             {job?.manifest && (
               <span className="text-xs text-muted-foreground">
-                {job.manifest.hls.renditions
-                  .map((rung) => (typeof rung === "string" ? rung : `${rung.name} CRF ${rung.crf}`))
-                  .join(" · ")}{" "}
-                ·{" "}
+                {job.manifest.hls.renditions.join(" · ")} ·{" "}
                 {job.manifest.hls.segmentSeconds}s segments ·{" "}
                 {job.manifest.source.width}×{job.manifest.source.height}
                 {/* Which dubs survived the ingest. Worth showing before the

@@ -32,9 +32,9 @@ export const run = async (job) => {
   try {
     await downloadFromS3(rawBucket, rawKey, input);
     const source = await probe(input);
-    await transcodeToHLS(input, outDir, source, {
-      onProgress: ({ percent }) => console.log(`Transcoding: ${Math.round(percent ?? 0)}%`),
-    });
+    await transcodeToHLS(input, outDir, source, ({ percent }) =>
+      console.log(`Transcoding: ${Math.round(percent ?? 0)}%`)
+    );
     await uploadDir(hlsBucket, outDir, contentId);
 
     const videoUrl = cloudfrontDomain

@@ -4,29 +4,29 @@
  * A system ffmpeg is preferred when present (it may carry NVENC); the bundled
  * static binaries are the fallback so the pipeline works on a bare checkout.
  */
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import ffmpegStatic from "ffmpeg-static";
 import ffprobeStatic from "ffprobe-static";
 
 export const FFMPEG_PATH = process.env.FFMPEG_PATH || ffmpegStatic;
 export const FFPROBE_PATH = process.env.FFPROBE_PATH || ffprobeStatic.path;
 
-/**
- * Hardware encoding, opt-in with USE_GPU=1.
- *
- * This used to switch itself on by looking for h264_nvenc in ffmpeg's encoder
- * list, which reports what the binary was *built* with rather than what the
- * machine actually has — a stock build advertises NVENC, AMF and QSV at once,
- * and no computer owns all three.
- *
- * Software is the default even where a GPU is genuinely present, because NVENC
- * buys its speed with bits. Measured on this library's own footage, it needed
- * 34.8 MB to carry a clip that x264 carried in 18.1 MB at the same perceptual
- * score. Transcoding happens once, offline, on a machine that is idle anyway;
- * the bytes are paid for every month, forever. Set USE_GPU=1 when a title is
- * wanted now rather than small.
- */
-export const useGpu = () => process.env.USE_GPU === "1";
+/** Detect NVENC once. USE_GPU=0 forces CPU, USE_GPU=1 forces GPU. */
+let gpuCache;
+export const hasGpu = () => {
+  if (gpuCache !== undefined) return gpuCache;
+  if (process.env.USE_GPU === "0") return (gpuCache = false);
+  if (process.env.USE_GPU === "1") return (gpuCache = true);
+  try {
+    const encoders = execFileSync(FFMPEG_PATH, ["-hide_banner", "-encoders"], {
+      encoding: "utf8",
+    });
+    gpuCache = encoders.includes("h264_nvenc");
+  } catch {
+    gpuCache = false;
+  }
+  return gpuCache;
+};
 
 /** `HH:MM:SS.mmm` -> seconds. */
 export const timemarkToSeconds = (timemark) => {

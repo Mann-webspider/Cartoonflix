@@ -73,30 +73,6 @@ export interface Content {
   seasons?: Season[];
 }
 
-/**
- * One rung of the encoding ladder.
- *
- * `crf` is the quality target — lower is better and larger, and a step of ~6
- * roughly halves or doubles the size. `maxrateK` is a peak cap that ordinary
- * footage never reaches; it exists so one violent scene cannot produce a
- * segment too big to arrive in time.
- */
-export interface LadderRung {
-  name: string;
-  height: number;
-  crf: number;
-  maxrateK: number;
-}
-
-export interface SizeEstimate {
-  durationSec: number;
-  sampledSeconds: number;
-  video: (LadderRung & { kbps: number; bytes: number })[];
-  audio: { name: string; kbps: number; bytes: number }[];
-  totalBytes: number;
-  sourceBytes: number;
-}
-
 export interface IngestJob {
   slug: string;
   status: "running" | "done" | "failed";
@@ -110,8 +86,7 @@ export interface IngestJob {
     skippedSubtitles?: { codec: string; label: string; reason: string }[];
     // audio is absent on manifests written before dubs were kept separately.
     hls: {
-      // Older manifests recorded only the rung's name.
-      renditions: (string | LadderRung)[];
+      renditions: string[];
       segmentSeconds: number;
       audio?: { language: string; label: string }[];
     };
@@ -278,30 +253,12 @@ export const uploadSubtitle = async (
 export const startIngest = (
   id: string,
   coords?: { season?: number; episode?: number },
-  thumbnails?: number,
-  ladder?: Partial<LadderRung>[]
+  thumbnails?: number
 ) =>
   request<{ job: IngestJob }>(`/ingest/${id}/start`, {
     method: "POST",
-    body: JSON.stringify({ ...coords, thumbnails, ladder }),
+    body: JSON.stringify({ ...coords, thumbnails }),
   }).then((r) => r.job);
-
-/**
- * Predict the published size at the given settings.
- *
- * Takes tens of seconds: it encodes short samples of the real file, because a
- * constant-quality ladder's size depends on the footage and multiplying the
- * bitrate cap by the runtime would overstate it several times over.
- */
-export const estimateIngest = (
-  id: string,
-  coords?: { season?: number; episode?: number },
-  ladder?: Partial<LadderRung>[]
-) =>
-  request<{ estimate: SizeEstimate }>(`/ingest/${id}/estimate`, {
-    method: "POST",
-    body: JSON.stringify({ ...coords, ladder }),
-  }).then((r) => r.estimate);
 
 export const getIngestStatus = (id: string, coords?: { season?: number; episode?: number }) => {
   const query = episodeParams(coords);
