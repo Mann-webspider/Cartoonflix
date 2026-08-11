@@ -1,9 +1,14 @@
 /**
  * Local media pipeline entrypoint.
  *
- *   node src/cli.js ingest   --source ./movie.mp4 --content <id> [--season 1 --episode 2] [--thumbs 10]
+ *   node src/cli.js ingest   --source ./movie.mp4 --content <id> [--season 1 --episode 2] [--thumbs 10] [--ladder <json>]
+ *   node src/cli.js estimate --source ./movie.mp4 [--ladder <json>] [--samples 3]
  *   node src/cli.js subtitle --content <id> --file ./subs.srt --language en [--label English]
  *   node src/cli.js publish  --content <id> [--season 1 --episode 2] [--poster 003.jpg] [--thumbnail 005.jpg]
+ *
+ * `--ladder` is a JSON array of per-rung overrides, e.g.
+ *   [{"name":"1080p","crf":21,"maxrateK":3500},{"name":"480p","crf":24}]
+ * Rungs left out keep their defaults rather than being dropped.
  *
  * `ingest` transcodes to `media/<slug>/` and touches nothing remote.
  * `publish` uploads that directory to S3 and prints the resulting URLs.
@@ -17,6 +22,8 @@ import path from "node:path";
 import { ingest, slugFor, readManifest, writeManifest, jobDir } from "./pipeline.js";
 import { publish } from "./publish.js";
 import { convertSidecar } from "./transcode/subtitles.js";
+import { probe } from "./transcode/probe.js";
+import { estimateLadder } from "./transcode/estimate.js";
 
 const argv = process.argv.slice(2);
 const command = argv[0];
@@ -47,6 +54,20 @@ const slugFromFlags = () =>
     episode: flag("episode") && Number(flag("episode")),
   });
 
+/** Per-rung overrides arrive as JSON so the shape stays the pipeline's, not a flag syntax. */
+const ladderFromFlags = () => {
+  const raw = flag("ladder");
+  if (!raw) return undefined;
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("--ladder must be JSON, e.g. [{\"name\":\"1080p\",\"crf\":21}]");
+  }
+  if (!Array.isArray(parsed)) throw new Error("--ladder must be a JSON array");
+  return parsed;
+};
+
 const commands = {
   async ingest() {
     const slug = slugFromFlags();
@@ -54,10 +75,27 @@ const commands = {
       sourcePath: requireFlag("source"),
       slug,
       thumbnailCount: flag("thumbs") ? Number(flag("thumbs")) : undefined,
+      ladder: ladderFromFlags(),
       onProgress: ({ stage, percent }) => emit({ type: "progress", stage, percent }),
     });
     if (!asJson) process.stderr.write("\n");
     emit({ type: "done", manifest });
+  },
+
+  /**
+   * Predict the published size of a source before committing to a full
+   * transcode, by encoding a few seconds of it at the real settings.
+   */
+  async estimate() {
+    const sourcePath = requireFlag("source");
+    const source = await probe(sourcePath);
+    const estimate = await estimateLadder(sourcePath, source, {
+      ladder: ladderFromFlags(),
+      samples: flag("samples") ? Number(flag("samples")) : undefined,
+      onProgress: ({ percent }) => emit({ type: "progress", stage: "estimate", percent }),
+    });
+    if (!asJson) process.stderr.write("\n");
+    emit({ type: "done", estimate });
   },
 
   /**

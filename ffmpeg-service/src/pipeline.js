@@ -44,6 +44,7 @@ const overall = (stage, percent) => {
  * @param {string} job.sourcePath        local video file to ingest
  * @param {string} job.slug              see slugFor()
  * @param {number} [job.thumbnailCount]
+ * @param {{name: string, crf?: number, maxrateK?: number}[]} [job.ladder]  per-rung overrides
  * @param {string} [job.root]
  * @param {(p: {stage: string, percent: number}) => void} [job.onProgress]
  * @returns {Promise<object>} the manifest, also written to manifest.json
@@ -52,6 +53,7 @@ export const ingest = async ({
   sourcePath,
   slug,
   thumbnailCount,
+  ladder,
   root = MEDIA_ROOT,
   onProgress = () => {},
 }) => {
@@ -68,9 +70,11 @@ export const ingest = async ({
   const source = await probe(sourcePath);
 
   onProgress({ stage: "transcode", percent: overall("transcode", 0) });
-  const hls = await transcodeToHLS(sourcePath, hlsDir, source, ({ percent }) =>
-    onProgress({ stage: "transcode", percent: overall("transcode", percent) })
-  );
+  const hls = await transcodeToHLS(sourcePath, hlsDir, source, {
+    ladder,
+    onProgress: ({ percent }) =>
+      onProgress({ stage: "transcode", percent: overall("transcode", percent) }),
+  });
 
   onProgress({ stage: "subtitles", percent: overall("subtitles", 0) });
   const { tracks: subtitles, skipped: skippedSubtitles } = await extractSubtitles(

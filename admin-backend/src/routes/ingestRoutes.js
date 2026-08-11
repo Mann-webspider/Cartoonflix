@@ -18,6 +18,7 @@ router.use(requireLocalPipeline);
 
 router.put("/ingest/:id/source", ingestController.uploadSource);
 router.put("/ingest/:id/subtitle", ingestController.uploadSubtitle);
+router.post("/ingest/:id/estimate", ingestController.estimateIngest);
 router.post("/ingest/:id/start", ingestController.startIngest);
 router.get("/ingest/:id", ingestController.getIngestStatus);
 router.post("/ingest/:id/publish", ingestController.publishIngest);

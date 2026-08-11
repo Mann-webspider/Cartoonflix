@@ -7,6 +7,9 @@ import {
   ffmpegPath,
   buildStreamArgs,
   labelAudioRenditions,
+  applyLadderOverrides,
+  CRF_RANGE,
+  MAXRATE_RANGE_K,
 } from "./transcode/hls.js";
 import { samplePoints } from "./transcode/thumbnails.js";
 import { normaliseLanguage, trackLabel } from "./transcode/probe.js";
@@ -85,6 +88,47 @@ test("trackLabel prefers the embedded title, then the language", () => {
   assert.equal(trackLabel({ language: "eng", forced: true, index: 0 }), "English (forced)");
   // No tag at all still produces a distinguishable menu entry.
   assert.equal(trackLabel({ index: 2 }), "Track 3");
+});
+
+test("applyLadderOverrides merges rather than replaces", () => {
+  const base = ladderFor(1080);
+
+  // A request naming one rung must not silently drop the others from the
+  // stream — that would publish a single-quality title that still claims to
+  // be adaptive.
+  const merged = applyLadderOverrides(base, [{ name: "1080p", crf: 19 }]);
+  assert.equal(merged.length, base.length);
+  assert.deepEqual(
+    merged.map((rung) => rung.name),
+    base.map((rung) => rung.name)
+  );
+
+  const top = merged.find((rung) => rung.name === "1080p");
+  assert.equal(top.crf, 19, "the named rung takes the override");
+  assert.equal(top.maxrateK, base.at(-1).maxrateK, "unmentioned fields keep their default");
+  assert.equal(merged[0].crf, base[0].crf, "an unmentioned rung is untouched");
+});
+
+test("applyLadderOverrides clamps values that would ruin a title", () => {
+  const base = ladderFor(1080);
+
+  // CRF 0 is lossless: a 97-minute film would run to tens of gigabytes, which
+  // is the exact bill this feature exists to avoid. A typo must not do that.
+  const silly = applyLadderOverrides(base, [
+    { name: "480p", crf: 0, maxrateK: 999999 },
+    { name: "720p", crf: 99, maxrateK: 1 },
+  ]);
+
+  assert.equal(silly[0].crf, CRF_RANGE.min);
+  assert.equal(silly[0].maxrateK, MAXRATE_RANGE_K.max);
+  assert.equal(silly[1].crf, CRF_RANGE.max);
+  assert.equal(silly[1].maxrateK, MAXRATE_RANGE_K.min);
+});
+
+test("no overrides leaves the ladder exactly as it was", () => {
+  const base = ladderFor(1080);
+  assert.equal(applyLadderOverrides(base, undefined), base);
+  assert.equal(applyLadderOverrides(base, []), base);
 });
 
 test("cdnUrl tolerates a CloudFront domain that already carries a scheme", () => {

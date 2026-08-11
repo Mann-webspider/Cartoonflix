@@ -39,6 +39,8 @@ An operator ingests a title on hardware they already own — probing it, buildin
 |---|---|
 | **Single-pass ABR ladder** | 480p/720p/1080p emitted in one ffmpeg pass via `-filter_complex split` + `-var_stream_map`. The source is decoded once, not once per rendition, and ffmpeg authors the master playlist itself. |
 | **Keyframe-aligned renditions** | Fixed GOP with scene-cut detection off, so every rendition cuts at identical timestamps — the precondition for switching quality mid-stream without a stall. |
+| **Constant-quality encoding** | Every rung targets a quality (CRF), not a bitrate, and `-tune animation` weights the encoder for flat cel-shaded regions bounded by hard lines. Constant bitrate spent the same bits on a held sky as on a fight scene: a 5.0 Mbps source became a 9.2 Mbps ladder, every rendition larger than the original. |
+| **Measured size prediction** | Before committing to a transcode, the admin encodes a few seconds from several points at the chosen settings and extrapolates. Per-rung quality is adjustable and the predicted upload updates against the measurement — no arithmetic on a bitrate cap the footage never reaches. |
 | **Multi-language audio** | Every audio stream in the source becomes its own HLS rendition in a shared audio group, so a dual-audio release keeps both dubs and the viewer picks. Switching quality no longer re-downloads the audio. |
 | **Subtitles** | Embedded text tracks are converted to WebVTT; `.srt`/`.ass`/`.vtt` sidecars can be uploaded. Bitmap tracks (PGS, VOBSUB) are reported as skipped with a reason rather than failing the ingest. |
 | **TV remote navigation** | Geometric D-pad focus across the whole site, with a selection box, seek/play/menus inside the player. Enabled only on devices with no pointer. |
@@ -49,35 +51,8 @@ An operator ingests a title on hardware they already own — probing it, buildin
 ---
 
 ## Architecture
+![Architecture](./public/architecture.png)
 
-```mermaid
-flowchart TB
-    subgraph local["Operator's machine — where the work happens"]
-        AF["Admin app<br/>Next.js"]
-        ADM["Admin API<br/>Node/Express"]
-        PIPE["Ingest pipeline<br/>ffprobe → HLS ladder → stills"]
-        DISK[("media/&lt;slug&gt;/<br/>source · hls · subs · thumbs")]
-    end
-
-    subgraph cloud["Hosted — pay-per-request or free tier"]
-        VF["Viewer app<br/>Next.js on Vercel"]
-        USR["Viewer API<br/>Lambda Function URL · Go/Fiber"]
-        DB[("MongoDB Atlas<br/>free tier")]
-        S3HLS[("S3 · HLS + posters")]
-        CF["CloudFront"]
-    end
-
-    AF -->|"details + source file"| ADM
-    ADM -->|spawns| PIPE
-    PIPE --> DISK
-    AF -->|"review stills, pick poster"| ADM
-    ADM -->|"publish: upload finished output"| S3HLS
-    ADM -->|"write location + metadata"| DB
-
-    VF --> USR
-    USR --> DB
-    VF -->|playback| CF --> S3HLS
-```
 
 ### The ingest pipeline
 
@@ -170,23 +145,6 @@ node src/cli.js publish --content <contentId> --poster 004.jpg --thumbnail 007.j
 
 A `Makefile` wraps the same commands as `make ingest` / `make publish` where `make` is available.
 
----
-
-## Configuration
-
-| Service | Variables |
-|---|---|
-| `user-backend` | `PORT`, `MONGO_URI`, `JWT_SECRET`, `ALLOWED_ORIGINS`, `CLOUDFRONT_KEYPAIR_ID`, `CLOUDFRONT_PRIVATE_KEY` |
-| `user-frontend` | `NEXT_PUBLIC_API_URL` — the API base; a bare Function URL is normalised to `/api/v1` automatically |
-| `admin-backend` | `PORT`, `MONGO_URI`, `AWS_REGION`, `HLS_BUCKET`, `RAW_BUCKET`, `CLOUDFRONT_DOMAIN`, `TMDB_API_KEY`, `TMDB_REGION`, `MEDIA_ROOT`, `FFMPEG_SERVICE_DIR` |
-| `ffmpeg-service` | `AWS_REGION`, `HLS_BUCKET`, `CLOUDFRONT_DOMAIN`, `MEDIA_ROOT` |
-| `frontend` | `NEXT_PUBLIC_ADMIN_API_URL` |
-
-AWS credentials are **not** read from `.env` — the SDK uses its default provider chain, so `aws configure` (or an instance role) is the single source. `CLOUDFRONT_DOMAIN` may be given with or without a scheme.
-
-Metadata enrichment needs a free TMDB key. Without it everything still works; the **Fill from TMDB** button simply reports the key is missing and fields are typed by hand.
-
-> TMDB rather than IMDb: IMDb publishes no public API and its terms forbid scraping. TMDB permits this use and carries the IMDb id, so titles can still link out.
 
 ---
 
@@ -230,15 +188,6 @@ Tests are deliberately narrow and cover the things that broke in production: pla
 
 ---
 
-## Roadmap
-
-- [x] **Phase 1** — security hardening, monorepo cleanup, key rotation
-- [x] **Phase 2** — Terraform infra + CI/CD
-- [x] **Phase 3** — serverless API (admin + user Lambdas) + on-demand transcode pipeline
-- [x] **Phase 4** — JWT auth, search, observability, admin dashboard, viewer app
-- [x] **Phase 5** — local-first ingest: single-pass keyframe-aligned ladder, still extraction and poster selection, series support, publish-to-S3 as an explicit step
-- [x] **Phase 6** — TMDB enrichment; admin rebuilt on shadcn + react-hook-form; subtitle extraction and sidecars; Media Chrome player with captions, quality, PiP and 10s skip; likes, reviews, share
-- [x] **Phase 7** — watch-page metadata and comments; multi-language audio; TV remote navigation; standalone Lambda Function URL deployment
 
 ### Known limitations
 

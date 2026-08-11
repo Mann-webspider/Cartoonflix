@@ -7,6 +7,7 @@ const {
   jobDir,
   getJob,
   startIngest,
+  runEstimate,
   runPublish,
   runSubtitleConvert,
 } = require("../ingest/jobs");
@@ -36,6 +37,24 @@ const coordinates = (req) => {
   const contentId = req.params.id;
   return { contentId, season, episode, slug: slugFor({ contentId, season, episode }) };
 };
+
+/**
+ * Accept only the fields the pipeline understands.
+ *
+ * The values themselves are clamped downstream, where the valid range lives
+ * next to the encoder that defines it — this just refuses to forward anything
+ * shaped wrong, so a malformed body cannot reach an ffmpeg argument list.
+ */
+const ladderFrom = (raw) =>
+  Array.isArray(raw)
+    ? raw
+        .filter((rung) => rung && typeof rung.name === "string")
+        .map(({ name, crf, maxrateK }) => ({
+          name,
+          ...(Number.isFinite(Number(crf)) ? { crf: Number(crf) } : {}),
+          ...(Number.isFinite(Number(maxrateK)) ? { maxrateK: Number(maxrateK) } : {}),
+        }))
+    : undefined;
 
 const findSourceFile = (slug) => {
   const dir = jobDir(slug);
@@ -152,6 +171,7 @@ exports.startIngest = async (req, res) => {
       contentId,
       sourcePath,
       thumbnails: Number(req.body?.thumbnails) || undefined,
+      ladder: ladderFrom(req.body?.ladder),
     });
 
     await Content.findByIdAndUpdate(contentId, { status: "processing", isReady: false });
@@ -159,6 +179,28 @@ exports.startIngest = async (req, res) => {
   } catch (err) {
     console.error("startIngest failed:", err);
     res.status(500).json({ error: "Failed to start the transcode" });
+  }
+};
+
+/**
+ * Predict what a transcode would publish, before running it.
+ *
+ * Slow on purpose: it encodes a few seconds from several points at the settings
+ * asked for, because a constant-quality ladder's size depends on the footage
+ * and no arithmetic on the bitrate cap can tell you what a title will cost.
+ */
+exports.estimateIngest = async (req, res) => {
+  try {
+    const { slug } = coordinates(req);
+
+    const sourcePath = findSourceFile(slug);
+    if (!sourcePath) return res.status(400).json({ error: "No source uploaded for this item yet" });
+
+    const event = await runEstimate({ sourcePath, ladder: ladderFrom(req.body?.ladder) });
+    res.json({ estimate: event.estimate });
+  } catch (err) {
+    console.error("estimateIngest failed:", err);
+    res.status(500).json({ error: err.message || "Failed to estimate the output size" });
   }
 };
 
