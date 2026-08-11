@@ -79,6 +79,8 @@ export interface IngestJob {
   stage?: string;
   percent?: number;
   error?: string | null;
+  /** Present only while this item's upload to S3 is in flight. */
+  publish?: { percent: number; startedAt: string } | null;
   manifest?: {
     thumbnails: string[];
     subtitles?: { file: string; language: string; label: string; source: string }[];

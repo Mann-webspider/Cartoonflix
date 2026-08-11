@@ -94,10 +94,13 @@ export default function MediaIngest({ contentId, season, episode, onPublished }:
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
   useEffect(() => {
-    if (!running) return;
+    // Also while publishing: the request that started the upload will not
+    // answer for the better part of an hour, so the only way to show progress
+    // is to ask the server how far it has got.
+    if (!running && busy !== "publish") return;
     const timer = setInterval(() => refreshRef.current(), POLL_MS);
     return () => clearInterval(timer);
-  }, [running]);
+  }, [running, busy]);
 
   const transcode = async () => {
     if (!file) return toast({ title: "Choose a video file first.", variant: "destructive" });
@@ -191,6 +194,16 @@ export default function MediaIngest({ contentId, season, episode, onPublished }:
 
       {running && (
         <Progress value={job?.percent ?? 0} label={STAGE_LABEL[job?.stage ?? ""] ?? "Processing"} />
+      )}
+
+      {/* Zero until the first file lands, which on a large title is a few
+          seconds of listing what is already uploaded — worth showing anyway, so
+          the wait reads as started rather than stuck. */}
+      {busy === "publish" && (
+        <Progress
+          value={job?.publish?.percent ?? 0}
+          label="Uploading to S3 — leave this tab open"
+        />
       )}
 
       {job?.status === "failed" && (

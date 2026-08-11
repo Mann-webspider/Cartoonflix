@@ -17,6 +17,17 @@ const MEDIA_ROOT = process.env.MEDIA_ROOT || path.resolve(__dirname, "../../../m
  */
 const jobs = new Map();
 
+/**
+ * Upload progress, by slug, for publishes currently in flight.
+ *
+ * Separate from the jobs map on purpose: a job's status describes its
+ * transcode, and a finished transcode must keep saying "done" while its upload
+ * runs — the admin is looking at that job's stills to choose a poster.
+ */
+const publishing = new Map();
+
+const getPublishProgress = (slug) => publishing.get(slug) ?? null;
+
 /** Storage key for one playable item — must match ffmpeg-service's slugFor(). */
 const slugFor = ({ contentId, season, episode }) =>
   season && episode ? `${contentId}/s${season}e${episode}` : String(contentId);
@@ -127,36 +138,53 @@ const appendEpisodeFlags = (args, slug) => {
  * Publishing and subtitle conversion both finish in seconds with the admin
  * waiting on the result, so unlike a transcode neither is tracked as a job.
  */
-const runCli = (args) =>
+const runCli = (args, onProgress) =>
   new Promise((resolve, reject) => {
     const child = spawn(process.execPath, args, {
       cwd: FFMPEG_SERVICE_DIR,
       env: { ...process.env, MEDIA_ROOT },
     });
 
-    let stdout = "";
+    let pending = "";
     let stderr = "";
-    child.stdout.on("data", (c) => (stdout += c.toString()));
+    let last = null;
+
+    // Read line by line as they arrive rather than buffering the lot: a publish
+    // runs for the better part of an hour, and progress that only appears once
+    // it has finished is not progress.
+    child.stdout.on("data", (chunk) => {
+      pending += chunk.toString();
+      const lines = pending.split("\n");
+      pending = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        let event;
+        try {
+          event = JSON.parse(line);
+        } catch {
+          continue; // stray non-JSON output is not worth failing over
+        }
+        if (event.type === "progress") onProgress?.(event);
+        else last = event;
+      }
+    });
+
     child.stderr.on("data", (c) => (stderr = (stderr + c.toString()).slice(-4096)));
     child.on("error", reject);
     child.on("close", (code) => {
-      const event = stdout
-        .split("\n")
-        .filter((line) => line.trim())
-        .map((line) => {
-          try {
-            return JSON.parse(line);
-          } catch {
-            return null;
-          }
-        })
-        .findLast(Boolean);
-
-      if (code === 0 && event && event.type !== "error") return resolve(event);
-      reject(new Error(event?.message || stderr.trim() || `${args[1]} exited ${code}`));
+      if (code === 0 && last && last.type !== "error") return resolve(last);
+      reject(new Error(last?.message || stderr.trim() || `${args[1]} exited ${code}`));
     });
   });
 
+/**
+ * Upload a finished job to S3.
+ *
+ * Progress is recorded against the slug rather than returned, because the
+ * request that started the publish will not answer until it is over — the
+ * browser watches the status endpoint in the meantime.
+ */
 const runPublish = ({ slug, contentId, poster, thumbnail }) => {
   const args = appendEpisodeFlags(
     ["src/cli.js", "publish", "--content", contentId, "--json"],
@@ -164,7 +192,11 @@ const runPublish = ({ slug, contentId, poster, thumbnail }) => {
   );
   if (poster) args.push("--poster", poster);
   if (thumbnail) args.push("--thumbnail", thumbnail);
-  return runCli(args);
+
+  publishing.set(slug, { percent: 0, startedAt: new Date().toISOString() });
+
+  return runCli(args, ({ percent }) => publishing.set(slug, { ...publishing.get(slug), percent }))
+    .finally(() => publishing.delete(slug));
 };
 
 /** Convert an uploaded sidecar to WebVTT and record it on the job's manifest. */
@@ -184,6 +216,7 @@ module.exports = {
   getJob,
   listJobs,
   startIngest,
+  getPublishProgress,
   runPublish,
   runSubtitleConvert,
 };

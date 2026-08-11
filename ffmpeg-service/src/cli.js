@@ -91,7 +91,9 @@ const commands = {
       cloudfrontDomain: process.env.CLOUDFRONT_DOMAIN,
       poster: flag("poster"),
       thumbnail: flag("thumbnail"),
+      onProgress: ({ percent }) => emit({ type: "progress", stage: "publish", percent }),
     });
+    if (!asJson) process.stderr.write("\n");
     emit({ type: "published", ...result });
   },
 };

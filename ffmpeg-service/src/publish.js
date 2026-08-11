@@ -32,6 +32,7 @@ export const publish = async ({
   poster,
   thumbnail,
   root = MEDIA_ROOT,
+  onProgress,
 }) => {
   if (!hlsBucket || !cloudfrontDomain) {
     throw new Error("publish: hlsBucket and cloudfrontDomain are required");
@@ -41,7 +42,17 @@ export const publish = async ({
   if (!manifest) throw new Error(`publish: no completed job for ${slug} — ingest it first`);
 
   const dir = jobDir(slug, root);
-  await uploadDir(hlsBucket, path.join(dir, "hls"), slug);
+
+  // The HLS tree is thousands of files and effectively all of the bytes, so it
+  // owns almost the whole bar; the tracks and stills that follow are a handful
+  // of small objects and get the last sliver.
+  const HLS_SHARE = 95;
+
+  await uploadDir(hlsBucket, path.join(dir, "hls"), slug, {
+    onProgress: ({ done, total }) =>
+      onProgress?.({ percent: total ? Math.round((done / total) * HLS_SHARE) : HLS_SHARE }),
+  });
+  onProgress?.({ percent: HLS_SHARE });
 
   // Subtitles sit beside the stream under the same prefix, so one CloudFront
   // behaviour and one CORS policy cover both.
@@ -71,7 +82,10 @@ export const publish = async ({
       new PutObjectCommand({
         Bucket: hlsBucket,
         Key: key,
-        Body: fs.createReadStream(local),
+        // A buffer, not a stream, for the same reason as every other upload
+        // here: a stream is spent after one read, so the SDK's own retry sends
+        // nothing and the connection dies waiting.
+        Body: fs.readFileSync(local),
         ContentType: contentTypeFor(local),
         CacheControl: "public, max-age=31536000, immutable",
       })
@@ -79,11 +93,14 @@ export const publish = async ({
     return cdnUrl(cloudfrontDomain, key);
   };
 
-  return {
+  const result = {
     videoUrl: cdnUrl(cloudfrontDomain, `${slug}/master.m3u8`),
     posterUrl: await uploadStill(poster, "poster"),
     thumbnailUrl: await uploadStill(thumbnail, "thumb"),
     durationSec: manifest.source.durationSec,
     subtitles,
   };
+
+  onProgress?.({ percent: 100 });
+  return result;
 };

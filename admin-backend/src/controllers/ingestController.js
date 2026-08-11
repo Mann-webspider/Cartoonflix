@@ -7,6 +7,7 @@ const {
   jobDir,
   getJob,
   startIngest,
+  getPublishProgress,
   runPublish,
   runSubtitleConvert,
 } = require("../ingest/jobs");
@@ -168,14 +169,20 @@ exports.startIngest = async (req, res) => {
  */
 exports.getIngestStatus = (req, res) => {
   const { slug } = coordinates(req);
+  // Carried on the job so one poll answers both questions: how the transcode
+  // went, and how far the upload that follows it has got.
+  const publish = getPublishProgress(slug);
+
   const job = getJob(slug);
-  if (job) return res.json({ job });
+  if (job) return res.json({ job: { ...job, publish } });
 
   const manifestPath = path.join(jobDir(slug), "manifest.json");
   if (!fs.existsSync(manifestPath)) return res.json({ job: null });
 
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  res.json({ job: { slug, status: "done", stage: "thumbnails", percent: 100, manifest } });
+  res.json({
+    job: { slug, status: "done", stage: "thumbnails", percent: 100, manifest, publish },
+  });
 };
 
 /**

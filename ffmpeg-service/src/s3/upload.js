@@ -54,10 +54,14 @@ const objectsUnder = async (bucket, prefix) => {
  * is no half-uploaded object to mistake for a finished one. Segments are also
  * immutable once written, so a match cannot be a stale different version.
  */
-export const uploadDir = async (bucket, dir, prefix, concurrency = DEFAULT_CONCURRENCY) => {
+export const uploadDir = async (
+  bucket,
+  dir,
+  prefix,
+  { concurrency = DEFAULT_CONCURRENCY, onProgress } = {}
+) => {
   const alreadyThere = await objectsUnder(bucket, prefix);
-  const limit = pLimit(concurrency);
-  const jobs = [];
+  const pending = [];
   let skipped = 0;
 
   const walk = (current, keyPrefix) => {
@@ -70,16 +74,33 @@ export const uploadDir = async (bucket, dir, prefix, concurrency = DEFAULT_CONCU
       } else if (alreadyThere.get(key) === fs.statSync(full).size) {
         skipped += 1;
       } else {
-        jobs.push(limit(() => putWithRetry(bucket, key, full)));
+        pending.push({ key, full });
       }
     }
   };
 
   walk(dir, prefix);
-  await Promise.all(jobs);
+
+  // Counted before uploading rather than as files are found, so the first
+  // progress report is against the real total instead of a number that keeps
+  // growing while the bar is already moving.
+  const total = pending.length;
+  const limit = pLimit(concurrency);
+  let done = 0;
+
+  await Promise.all(
+    pending.map(({ key, full }) =>
+      limit(async () => {
+        await putWithRetry(bucket, key, full);
+        done += 1;
+        onProgress?.({ done, total, skipped });
+      })
+    )
+  );
 
   const resumed = skipped ? `, ${skipped} already uploaded` : "";
-  console.log(`Uploaded ${jobs.length} files to s3://${bucket}/${prefix}${resumed}`);
+  console.log(`Uploaded ${total} files to s3://${bucket}/${prefix}${resumed}`);
+  return { uploaded: total, skipped };
 };
 
 /**
