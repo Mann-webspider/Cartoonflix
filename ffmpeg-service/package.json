@@ -15,6 +15,7 @@
     "@aws-sdk/client-ecs": "^3.717.0",
     "@aws-sdk/client-s3": "^3.717.0",
     "@aws-sdk/client-secrets-manager": "^3.717.0",
+    "@smithy/node-http-handler": "^3.3.3",
     "ffmpeg-static": "^5.2.0",
     "ffprobe-static": "^3.1.0",
     "mongodb": "^6.12.0",

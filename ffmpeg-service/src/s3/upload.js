@@ -1,8 +1,20 @@
 import fs from "node:fs";
 import path from "node:path";
 import pLimit from "p-limit";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { ListObjectsV2Command, PutObjectCommand } from "@aws-sdk/client-s3";
 import { s3 } from "../lib/s3.js";
+
+/**
+ * How many uploads run at once.
+ *
+ * Four rather than eight. A film's HLS tree is thousands of files against a
+ * home connection's upstream, and past a certain point extra parallelism stops
+ * adding throughput and starts dividing it: connections take turns, one of them
+ * goes quiet for more than twenty seconds, and S3 closes it as idle. The error
+ * that surfaces talks about sockets and timeouts and says nothing about there
+ * having been too many of them.
+ */
+const DEFAULT_CONCURRENCY = 4;
 
 export const contentTypeFor = (file) =>
   file.endsWith(".m3u8") ? "application/x-mpegURL"
@@ -13,20 +25,50 @@ export const contentTypeFor = (file) =>
   : file.endsWith(".vtt") ? "text/vtt"
   : "application/octet-stream";
 
+/** Every object already under a prefix, keyed by name, with its size. */
+const objectsUnder = async (bucket, prefix) => {
+  const sizes = new Map();
+  let token;
+
+  do {
+    const page = await s3.send(
+      new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, ContinuationToken: token })
+    );
+    for (const object of page.Contents ?? []) sizes.set(object.Key, object.Size);
+    token = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (token);
+
+  return sizes;
+};
+
 /**
  * Recursively upload a local directory to s3://bucket/prefix, preserving layout.
- * Concurrency-limited; retries transient failures.
+ *
+ * Files already present at the same size are skipped. A publish is thousands of
+ * objects and the better part of an hour on a home connection, and without this
+ * any failure near the end threw all of it away — the retry started again from
+ * the first segment and stood the same chance of dying at the same place.
+ *
+ * Size is enough to call an object done. A PutObject either completes or does
+ * not appear at all, so a segment of the right length was written whole; there
+ * is no half-uploaded object to mistake for a finished one. Segments are also
+ * immutable once written, so a match cannot be a stale different version.
  */
-export const uploadDir = async (bucket, dir, prefix, concurrency = 8) => {
+export const uploadDir = async (bucket, dir, prefix, concurrency = DEFAULT_CONCURRENCY) => {
+  const alreadyThere = await objectsUnder(bucket, prefix);
   const limit = pLimit(concurrency);
   const jobs = [];
+  let skipped = 0;
 
   const walk = (current, keyPrefix) => {
     for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
       const full = path.join(current, entry.name);
       const key = `${keyPrefix}/${entry.name}`.replace(/\\/g, "/");
+
       if (entry.isDirectory()) {
         walk(full, key);
+      } else if (alreadyThere.get(key) === fs.statSync(full).size) {
+        skipped += 1;
       } else {
         jobs.push(limit(() => putWithRetry(bucket, key, full)));
       }
@@ -35,7 +77,9 @@ export const uploadDir = async (bucket, dir, prefix, concurrency = 8) => {
 
   walk(dir, prefix);
   await Promise.all(jobs);
-  console.log(`Uploaded ${jobs.length} files to s3://${bucket}/${prefix}`);
+
+  const resumed = skipped ? `, ${skipped} already uploaded` : "";
+  console.log(`Uploaded ${jobs.length} files to s3://${bucket}/${prefix}${resumed}`);
 };
 
 /**
