@@ -246,6 +246,25 @@ export const transcodeToHLS = async (input, outDir, source, onProgress) => {
   );
 
   const master = path.join(outDir, "master.m3u8");
+
+  // `-hls_playlist_type vod` writes every playlist at the end of the encode,
+  // because a VOD playlist has to list all its segments and close with
+  // EXT-X-ENDLIST. So an interrupted run leaves a full tree of .ts files and
+  // not one .m3u8 — gigabytes on disk with nothing able to play them, and no
+  // manifest, since the pipeline never gets this far.
+  //
+  // Said plainly here because the symptom points nowhere near the cause: the
+  // next line would otherwise fail with ENOENT on a file ffmpeg was never
+  // going to write.
+  if (!fs.existsSync(master)) {
+    throw new Error(
+      `ffmpeg finished without writing ${path.basename(master)}. A VOD playlist ` +
+        `is only written once the encode completes, so this usually means the ` +
+        `transcode was interrupted — the segments already in ${outDir} cannot be ` +
+        `played and the title has to be ingested again.`
+    );
+  }
+
   if (audioRenditions.length) {
     const labelled = labelAudioRenditions(
       fs.readFileSync(master, "utf8"),
