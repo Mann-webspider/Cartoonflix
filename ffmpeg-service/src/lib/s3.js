@@ -1,5 +1,20 @@
 import { S3Client } from "@aws-sdk/client-s3";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
+import { EventEmitter } from "node:events";
+
+/**
+ * Node warns once an emitter passes ten listeners, on the assumption that a
+ * leak is the reason. Here it is not: every in-flight request registers a
+ * timeout listener on its pooled TLS socket, and six files uploading two
+ * parts each clears ten legitimately.
+ *
+ * Worth silencing rather than tolerating. The warning goes to stderr, the
+ * admin server keeps only the last four kilobytes of that, and one publish
+ * produced twenty-nine of them at nearly two hundred characters apiece — so
+ * an actual error would have been pushed out of the buffer by warnings about
+ * nothing being wrong.
+ */
+EventEmitter.defaultMaxListeners = 32;
 
 /**
  * How long a single request may take before it is abandoned.
