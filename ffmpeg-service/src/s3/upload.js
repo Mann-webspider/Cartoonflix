@@ -1,20 +1,38 @@
 import fs from "node:fs";
 import path from "node:path";
 import pLimit from "p-limit";
-import { ListObjectsV2Command, PutObjectCommand } from "@aws-sdk/client-s3";
+import { ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
 import { s3 } from "../lib/s3.js";
 
 /**
- * How many uploads run at once.
+ * How many files upload at once.
  *
- * Four rather than eight. A film's HLS tree is thousands of files against a
- * home connection's upstream, and past a certain point extra parallelism stops
- * adding throughput and starts dividing it: connections take turns, one of them
- * goes quiet for more than twenty seconds, and S3 closes it as idle. The error
- * that surfaces talks about sockets and timeouts and says nothing about there
- * having been too many of them.
+ * Measured on this library's own segments rather than guessed, because the
+ * intuition that more is faster is wrong here: 4 gave 2.82 MB/s, 8 gave 3.00,
+ * and 16 collapsed to 1.66 with the median request rising from two seconds to
+ * forty. The upstream link saturates around three megabytes a second and extra
+ * connections past that point stop adding throughput and start dividing it.
+ *
+ * Six sits near the peak with room before the collapse, on the assumption that
+ * a domestic connection has worse days than the one it was measured on.
  */
-const DEFAULT_CONCURRENCY = 4;
+const DEFAULT_CONCURRENCY = 6;
+
+/**
+ * Multipart settings.
+ *
+ * Five megabytes is S3's minimum part size, so a ten-second 1080p segment —
+ * about seven megabytes — becomes two parts and everything smaller stays a
+ * single request. That is the point: this connection has been observed taking
+ * sixty-six seconds over one segment, and a stall costs a part rather than the
+ * whole file, retried on its own.
+ *
+ * Two parts in flight per file, against six files, keeps the number of open
+ * connections in the range that measured fastest.
+ */
+const PART_SIZE = 5 * 1024 * 1024;
+const PARTS_IN_FLIGHT = 2;
 
 export const contentTypeFor = (file) =>
   file.endsWith(".m3u8") ? "application/x-mpegURL"
@@ -49,9 +67,9 @@ const objectsUnder = async (bucket, prefix) => {
  * any failure near the end threw all of it away — the retry started again from
  * the first segment and stood the same chance of dying at the same place.
  *
- * Size is enough to call an object done. A PutObject either completes or does
- * not appear at all, so a segment of the right length was written whole; there
- * is no half-uploaded object to mistake for a finished one. Segments are also
+ * Size is enough to call an object done. An upload either completes or does not
+ * appear at all, so a segment of the right length was written whole; there is no
+ * half-uploaded object to mistake for a finished one. Segments are also
  * immutable once written, so a match cannot be a stale different version.
  */
 export const uploadDir = async (
@@ -104,32 +122,42 @@ export const uploadDir = async (
 };
 
 /**
- * Upload one file, retrying transient failures.
+ * Upload one file, in parts when it is large enough to have them.
  *
- * The body is read into a buffer rather than streamed, which matters more than
- * it looks. A stream can only be consumed once, and the SDK retries internally
- * before this function ever sees a failure — on that retry it re-sends a stream
- * that is already at its end, so no bytes go out, and S3 eventually closes the
- * connection with "your socket connection to the server was not read from or
- * written to within the timeout period". The error names a socket and blames
- * the network for what is really an exhausted stream.
+ * The body is a buffer rather than a stream, which matters more than it looks.
+ * A stream can only be consumed once, and a retry re-sends one already at its
+ * end — no bytes go out, and S3 eventually closes the connection with "your
+ * socket connection to the server was not read from or written to within the
+ * timeout period", an error that names a socket and blames the network for what
+ * is really an exhausted stream. A buffer is re-sendable and carries its own
+ * length. Safe here because publish only ever sends playlists, stills and
+ * segments; the multi-gigabyte source is never uploaded.
  *
- * A buffer is re-sendable and carries its own length, so both the SDK's retries
- * and the loop below actually work. Safe here because this only ever uploads
- * playlists, stills and HLS segments — a ten-second 1080p segment is a few
- * megabytes, and the multi-gigabyte source file is never sent at all.
+ * The outer loop retries the upload as a whole, on top of the per-part retries
+ * inside it, because the failures worth surviving on this connection are
+ * transient and the next attempt usually works.
  */
 const putWithRetry = async (bucket, key, filePath, retries = 3) => {
   const body = fs.readFileSync(filePath);
 
   for (let attempt = 1; ; attempt++) {
     try {
-      await s3.send(new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: body,
-        ContentType: contentTypeFor(filePath),
-      }));
+      const upload = new Upload({
+        client: s3,
+        params: {
+          Bucket: bucket,
+          Key: key,
+          Body: body,
+          ContentType: contentTypeFor(filePath),
+        },
+        partSize: PART_SIZE,
+        queueSize: PARTS_IN_FLIGHT,
+        // Abandoned parts are invisible in a bucket listing and billed until
+        // something removes them, so a failed upload cleans up after itself.
+        leavePartsOnError: false,
+      });
+
+      await upload.done();
       return;
     } catch (err) {
       if (attempt >= retries) throw err;

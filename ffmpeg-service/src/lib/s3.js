@@ -2,22 +2,21 @@ import { S3Client } from "@aws-sdk/client-s3";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 
 /**
- * A stalled request is abandoned well before S3 would abandon it.
+ * How long a single request may take before it is abandoned.
  *
- * Publishing a film is thousands of uploads over the better part of an hour on
- * a domestic connection, and that connection stalls occasionally: measured over
- * one batch of segments, half completed in about a second and one took twenty
- * one. S3 stops waiting at roughly twenty seconds and answers "your socket
- * connection to the server was not read from or written to within the timeout
- * period" — so on a long enough publish, one unlucky segment ends the whole
- * thing.
+ * Fifteen seconds was wrong, and wrong in the direction that breaks things:
+ * it was chosen to fire before S3 gives up on an idle socket at about twenty,
+ * but this connection produces requests that legitimately run far longer than
+ * that. Measured over thirty segments, the median took two seconds and the
+ * slowest took sixty-six — so the timeout was killing healthy uploads and
+ * reporting it as "Connection timed out after 15000 ms".
  *
- * Fifteen seconds is comfortably below where S3 gives up and roughly nine times
- * the slowest ordinary request, so a healthy upload is never cut short; a stuck
- * one is dropped and retried on a fresh connection instead of waiting to be
- * refused.
+ * Five minutes is the value of a socket that is genuinely dead rather than
+ * merely slow. S3 answers a stalled request itself long before this, and that
+ * answer is retried; this only catches a connection that has stopped
+ * existing without saying so.
  */
-const REQUEST_TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MS = 300_000;
 const CONNECTION_TIMEOUT_MS = 10_000;
 
 /**
