@@ -222,13 +222,23 @@ export default function MediaIngest({ contentId, season, episode, onPublished }:
             </p>
           </div>
 
+          {/* Silence here read as a broken pipeline. A file simply having no
+              subtitle streams is the ordinary case and has to say so, or the
+              only way to tell it apart from a failure is to go and probe the
+              source by hand. */}
+          {tracks.length === 0 && skippedTracks.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No subtitle streams in this file — nothing to extract.
+            </p>
+          )}
+
           {tracks.length > 0 && (
             <ul className="flex flex-wrap gap-1.5">
               {tracks.map((track) => (
                 <li key={track.file}>
                   <Badge variant="secondary">
                     {track.label}
-                    {track.source === "uploaded" ? " · uploaded" : ""}
+                    {track.source === "uploaded" ? " · uploaded" : " · from the file"}
                   </Badge>
                 </li>
               ))}
