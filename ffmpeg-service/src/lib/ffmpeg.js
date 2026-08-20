@@ -11,20 +11,59 @@ import ffprobeStatic from "ffprobe-static";
 export const FFMPEG_PATH = process.env.FFMPEG_PATH || ffmpegStatic;
 export const FFPROBE_PATH = process.env.FFPROBE_PATH || ffprobeStatic.path;
 
-/** Detect NVENC once. USE_GPU=0 forces CPU, USE_GPU=1 forces GPU. */
+/** Windows reports a crashed process as 0xC0000005 rather than an exit code. */
+const ACCESS_VIOLATION = 3221225477;
+
+/**
+ * Is NVENC usable right now?
+ *
+ * Not "was ffmpeg built with it". This build advertises twelve hardware
+ * encoders across three vendors, and no machine owns all three — so the encoder
+ * list says nothing about the hardware in front of it. On a laptop with
+ * switchable graphics the discrete card is not always awake either, which makes
+ * the answer a property of this moment rather than of the installation.
+ *
+ * So encode a frame and look. Asking the list instead is what produced
+ * "ffmpeg exited 3221225477": ffmpeg got as far as "No capable devices found"
+ * and then died of an access violation, losing the transcode and naming nothing
+ * useful on the way out.
+ *
+ * The probe costs a fraction of a second against a transcode measured in tens
+ * of minutes, and is cached for the life of the process. USE_GPU=0 forces
+ * software; USE_GPU=1 trusts the caller and skips the probe.
+ */
 let gpuCache;
 export const hasGpu = () => {
   if (gpuCache !== undefined) return gpuCache;
   if (process.env.USE_GPU === "0") return (gpuCache = false);
   if (process.env.USE_GPU === "1") return (gpuCache = true);
+
   try {
-    const encoders = execFileSync(FFMPEG_PATH, ["-hide_banner", "-encoders"], {
-      encoding: "utf8",
-    });
-    gpuCache = encoders.includes("h264_nvenc");
+    execFileSync(
+      FFMPEG_PATH,
+      [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=256x144:rate=25:duration=0.1",
+        "-c:v",
+        "h264_nvenc",
+        "-f",
+        "null",
+        "-",
+      ],
+      { stdio: "ignore", timeout: 30_000 }
+    );
+    gpuCache = true;
   } catch {
+    // No card, no driver, or it is asleep. Software encoding is slower, but it
+    // finishes, and a crash does not.
     gpuCache = false;
   }
+
   return gpuCache;
 };
 
@@ -32,6 +71,24 @@ export const hasGpu = () => {
 export const timemarkToSeconds = (timemark) => {
   const [h, m, s] = timemark.split(":").map(Number);
   return h * 3600 + m * 60 + s;
+};
+
+/**
+ * Describe an ffmpeg failure in terms someone can act on.
+ *
+ * A bare "exited 3221225477" names nothing: it is a Windows access violation,
+ * meaning ffmpeg crashed rather than refused. The GPU encoder is the usual
+ * reason that happens here, and the way round it is one environment variable,
+ * so say which rather than leave the next transcode to fail the same way.
+ */
+export const describeFailure = (code, stderr = "") => {
+  const detail = stderr.trim();
+  const crashed = code === ACCESS_VIOLATION ? " (crashed: access violation)" : "";
+  const gpu = /no capable devices|nvenc/i.test(detail)
+    ? "\n\nThe GPU encoder is unavailable. Set USE_GPU=0 to transcode on the CPU."
+    : "";
+
+  return `ffmpeg exited ${code}${crashed}\n${detail}${gpu}`;
 };
 
 /**
@@ -84,8 +141,6 @@ export const runFfmpeg = (args, { durationSec, onProgress } = {}) =>
 
     child.on("error", reject);
     child.on("close", (code) =>
-      code === 0
-        ? resolve()
-        : reject(new Error(`ffmpeg exited ${code}\n${stderr.trim()}`))
+      code === 0 ? resolve() : reject(new Error(describeFailure(code, stderr)))
     );
   });
