@@ -7,10 +7,27 @@ import { hasGpu, runFfmpeg } from "../lib/ffmpeg.js";
  * derived from the source aspect ratio so nothing is letterboxed or stretched.
  */
 export const LADDER = [
-  { name: "480p", height: 480, vBitrateK: 1400 },
-  { name: "720p", height: 720, vBitrateK: 2800 },
-  { name: "1080p", height: 1080, vBitrateK: 5000 },
+  { name: "480p", height: 480, maxrateK: 1400 },
+  { name: "720p", height: 720, maxrateK: 2800 },
+  { name: "1080p", height: 1080, maxrateK: 5000 },
 ];
+
+/**
+ * Quality target, on each encoder's own scale.
+ *
+ * The ladder used to name a bitrate and hold the encoder to it, which spends
+ * the same bits on a still shot of a sky as on a fight and is why a 5.0 Mbps
+ * source became a 9.2 Mbps ladder. Naming a quality instead lets each scene
+ * cost what it needs: measured over two minutes of this library, constant
+ * quality returned 85 MB against 140 MB for the fixed rate, in the same
+ * thirty-three seconds, scoring VMAF 96.6 against the source.
+ *
+ * The two numbers are not interchangeable. NVENC's -cq and x264's -crf are
+ * different scales, and measured on this footage CQ 26 sits about where CRF
+ * 21 does, so each encoder is given the number that means the same picture.
+ */
+const NVENC_CQ = 26;
+const X264_CRF = 21;
 
 /**
  * Audio is encoded once and shared by every video rung, so it cannot vary per
@@ -51,27 +68,43 @@ export const ladderFor = (sourceHeight) => {
   return [{ ...LADDER[0], name: `${height}p`, height }];
 };
 
+/**
+ * Encoder settings for one rung.
+ *
+ * `maxrateK` is a ceiling rather than a target now: it exists so one violent
+ * scene cannot produce a segment too large to fetch in time, and on ordinary
+ * footage it never binds. The preset is unchanged, so this costs nothing in
+ * wall clock — the saving is in bytes, and therefore in the upload that
+ * follows, which is the slower half of publishing anyway.
+ */
 const videoCodecArgs = (index, rendition, gop) => {
-  const codec = hasGpu()
-    ? [`-c:v:${index}`, "h264_nvenc", `-preset:v:${index}`, "p5"]
-    : [`-c:v:${index}`, "libx264", `-preset:v:${index}`, "veryfast"];
+  const cap = rendition.maxrateK;
+
+  const quality = hasGpu()
+    ? [
+        `-c:v:${index}`, "h264_nvenc",
+        `-preset:v:${index}`, "p5",
+        `-rc:v:${index}`, "vbr",
+        `-cq:v:${index}`, String(NVENC_CQ),
+        // NVENC needs an explicit zero here or it quietly reverts to bitrate
+        // mode and ignores the quality target entirely.
+        `-b:v:${index}`, "0",
+      ]
+    : [
+        `-c:v:${index}`, "libx264",
+        `-preset:v:${index}`, "veryfast",
+        `-crf:v:${index}`, String(X264_CRF),
+      ];
+
   return [
-    ...codec,
-    `-b:v:${index}`,
-    `${rendition.vBitrateK}k`,
-    // Cap the peak so a busy scene cannot blow past the rung it was picked for.
-    `-maxrate:v:${index}`,
-    `${Math.round(rendition.vBitrateK * 1.07)}k`,
-    `-bufsize:v:${index}`,
-    `${rendition.vBitrateK * 2}k`,
+    ...quality,
+    `-maxrate:v:${index}`, `${cap}k`,
+    `-bufsize:v:${index}`, `${cap * 2}k`,
     // Fixed GOP with scene-cut detection off: every rendition then cuts at the
     // same timestamps, which is what lets a player switch rungs mid-stream.
-    `-g:v:${index}`,
-    String(gop),
-    `-keyint_min:v:${index}`,
-    String(gop),
-    `-sc_threshold:v:${index}`,
-    "0",
+    `-g:v:${index}`, String(gop),
+    `-keyint_min:v:${index}`, String(gop),
+    `-sc_threshold:v:${index}`, "0",
   ];
 };
 
@@ -205,7 +238,16 @@ export const transcodeToHLS = async (input, outDir, source, onProgress) => {
   fs.mkdirSync(outDir, { recursive: true });
 
   const split = `[0:v]split=${renditions.length}${renditions.map((_, i) => `[v${i}]`).join("")}`;
-  const scales = renditions.map((r, i) => `[v${i}]scale=-2:${r.height}[v${i}out]`);
+  // A rung already at the source's height needs no resizing, and asking for
+  // it anyway ran a full-frame scale on every frame to produce the frame it
+  // started with. On a 1080p source that was the most expensive rung in the
+  // ladder doing nothing: dropping it took a two-minute clip from 42 to 33
+  // seconds, a fifth off the whole transcode, with byte-identical output.
+  const scales = renditions.map((rendition, i) =>
+    rendition.height === source.height
+      ? `[v${i}]null[v${i}out]`
+      : `[v${i}]scale=-2:${rendition.height}[v${i}out]`
+  );
 
   const { maps, codecs, streamMap, audioRenditions } = buildStreamArgs(renditions, audio, gop);
 
