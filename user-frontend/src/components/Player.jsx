@@ -28,6 +28,7 @@ import {
 import { saveProgress } from "@/lib/api";
 import { detectTv } from "@/lib/tv";
 import { SEEK_SECONDS } from "@/lib/playback";
+import { track } from "@/lib/analytics";
 
 /** How often playback position is written back to the API. */
 const SYNC_INTERVAL_MS = 15000;
@@ -187,12 +188,45 @@ export default function Player({
       }
     };
 
+    // Milestones rather than a running count. A quarter of the way through is
+    // the number that answers "did anyone actually watch this"; a row every
+    // few seconds would answer the same question and cost a thousand times
+    // the writes on a free-tier database.
+    const milestones = [25, 50, 75, 95];
+    const reached = new Set();
+    let started = false;
+
+    const onPlaying = () => {
+      if (started) return;
+      started = true;
+      track("play_start", { content_id: id, season, episode });
+    };
+
+    const onMilestone = () => {
+      if (!video.duration) return;
+      const percent = (video.currentTime / video.duration) * 100;
+      for (const mark of milestones) {
+        if (percent >= mark && !reached.has(mark)) {
+          reached.add(mark);
+          track(mark === 95 ? "play_complete" : "play_progress", {
+            content_id: id,
+            season,
+            episode,
+            percent: mark,
+            seconds: Math.floor(video.currentTime),
+          });
+        }
+      }
+    };
+
     const onTime = () => {
+      onMilestone();
       localStorage.setItem(storageKey, String(video.currentTime));
       sync(video.currentTime, video.duration);
     };
     const flush = () => sync(video.currentTime, video.duration, true);
 
+    video.addEventListener("playing", onPlaying);
     video.addEventListener("loadedmetadata", onLoaded);
     video.addEventListener("timeupdate", onTime);
     video.addEventListener("pause", flush);
@@ -200,6 +234,7 @@ export default function Player({
 
     return () => {
       flush();
+      video.removeEventListener("playing", onPlaying);
       video.removeEventListener("loadedmetadata", onLoaded);
       video.removeEventListener("timeupdate", onTime);
       video.removeEventListener("pause", flush);

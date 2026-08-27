@@ -85,6 +85,26 @@ func displayNameFor(ctx context.Context, userID string) string {
 	return "Viewer"
 }
 
+// emailFor resolves the address to record against a signed-in visitor's
+// activity, so the analytics dashboard can say who watched rather than only
+// how many did.
+//
+// Read from the database like the display name, and for the same reason: an
+// address taken from the request body would let a caller file its browsing
+// under somebody else's account.
+func emailFor(ctx context.Context, userID string) string {
+	id, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return ""
+	}
+
+	var user User
+	if err := users().FindOne(ctx, bson.M{"_id": id}).Decode(&user); err != nil {
+		return ""
+	}
+	return user.Email
+}
+
 // Claims match what the admin API mints so one JWT_SECRET covers both services.
 func mintToken(u User) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{

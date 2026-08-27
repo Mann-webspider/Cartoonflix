@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Film, LayoutDashboard, Archive, Plus } from "lucide-react";
+import { Film, LayoutDashboard, Archive, Plus, BarChart3 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ const NAV = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/admin/library", label: "Library", icon: Film },
   { href: "/admin/archive", label: "Archive", icon: Archive },
+  { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
 ];
 
 /**

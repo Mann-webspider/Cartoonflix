@@ -26,10 +26,12 @@ const contentRoutes = require('./routes/contentRoutes');
 const s3UploadsRoutes = require('./routes/s3UploadsRotes');
 const ingestRoutes = require('./routes/ingestRoutes');
 const tmdbRoutes = require('./routes/tmdbRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
 
 app.use('/api/v1/admin', contentRoutes);
 app.use('/api/v1/admin', s3UploadsRoutes);
 app.use('/api/v1/admin', ingestRoutes);
 app.use('/api/v1/admin', tmdbRoutes);
+app.use('/api/v1/admin', analyticsRoutes);
 
 module.exports = app;

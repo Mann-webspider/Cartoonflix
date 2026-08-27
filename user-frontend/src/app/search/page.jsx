@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import TitleCard from "@/components/TitleCard";
 import { SearchIcon } from "@/components/Icons";
 import { contentId, searchContents } from "@/lib/api";
+import { track } from "@/lib/analytics";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 export default function SearchPage() {
@@ -34,7 +35,13 @@ function Search() {
     setResults(null);
     setFailure(null);
     searchContents(query)
-      .then(setResults)
+      .then((found) => {
+        setResults(found);
+        // Recorded with its result count, because a search that found nothing
+        // is the most useful row in the table: it names something a viewer
+        // expected the library to have.
+        track("search", { query, count: found.length });
+      })
       .catch((err) => {
         setFailure(err.message);
         setResults([]);

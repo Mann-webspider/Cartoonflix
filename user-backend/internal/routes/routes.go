@@ -20,6 +20,15 @@ func SetupRoutes(app *fiber.App) {
 	api.Post("/auth/login", controllers.Login)
 	api.Get("/auth/me", middleware.RequireAuth, controllers.Me)
 
+	// Analytics. OptionalAuth rather than RequireAuth: most visitors are signed
+	// out and they are the ones worth counting, but a token turns an anonymous
+	// session into a named one.
+	//
+	// Write-only on purpose. Reading these back means visitor addresses and
+	// email addresses, and that belongs on the admin machine rather than behind
+	// an internet-facing endpoint.
+	api.Post("/events", middleware.OptionalAuth, controllers.CollectEvents)
+
 	// Public catalogue
 	api.Get("/content", controllers.GetCollectionContent)
 	api.Get("/contents", controllers.GetContent)
