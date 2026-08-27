@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { DetailSkeleton } from "@/components/Skeleton";
 import { TitleFacts, TitleCredits, CastRail } from "@/components/TitleMeta";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { track } from "@/lib/analytics";
 import {
   contentId,
   getContent,
@@ -29,6 +30,12 @@ export default function TitlePage({ params }) {
   const [social, setSocial] = useState(null);
 
   useDocumentTitle(item?.title);
+
+  // What "exploring" looks like in the data: a title opened, whether or not
+  // anything was ever played from it.
+  useEffect(() => {
+    track("title_view", { content_id: String(id) });
+  }, [id]);
 
   useEffect(() => {
     getSocial(id).then(setSocial);

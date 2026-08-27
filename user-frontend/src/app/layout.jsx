@@ -1,6 +1,8 @@
 import "./globals.css";
 import Header from "@/components/Header";
+import { Suspense } from "react";
 import TvNavigation from "@/components/TvNavigation";
+import Analytics from "@/components/Analytics";
 import { SessionProvider } from "@/components/SessionProvider";
 
 export const metadata = {
@@ -55,6 +57,12 @@ export default function RootLayout({ children }) {
         {/* Renders nothing. Installs D-pad navigation when the device turns out
             to be a television, and stays out of the way otherwise. */}
         <TvNavigation />
+        {/* Reads the query string, which makes it a suspense boundary; without
+            one, every page that renders it would be forced out of static
+            generation for the sake of a counter. */}
+        <Suspense fallback={null}>
+          <Analytics />
+        </Suspense>
         <SessionProvider>
           {/* The header is nine tab stops deep and fixed on every route; without
               this, keyboard users cross it again after each navigation. */}

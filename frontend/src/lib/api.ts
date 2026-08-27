@@ -73,6 +73,29 @@ export interface Content {
   seasons?: Season[];
 }
 
+/** A bucket in one of the dashboard's breakdowns. */
+export interface Bucket {
+  name: string;
+  count: number;
+}
+
+export interface Analytics {
+  range: { from: string; to: string };
+  totals: { events: number; visitors: number; sessions: number; signedIn: number };
+  byType: Bucket[];
+  daily: { day: string; events: number; visitors: number }[];
+  countries: Bucket[];
+  cities: Bucket[];
+  referrers: Bucket[];
+  campaigns: Bucket[];
+  devices: Bucket[];
+  browsers: Bucket[];
+  pages: Bucket[];
+  titles: { content_id: string; title: string; opened: number; played: number; finished: number }[];
+  emptySearches: { query: string; times: number }[];
+  people: { email: string; events: number; lastSeen: string; titlesWatched: number }[];
+}
+
 export interface IngestJob {
   slug: string;
   status: "running" | "done" | "failed";
@@ -303,4 +326,21 @@ export const uploadArtwork = async (id: string, file: File, kind: "poster" | "th
   if (!put.ok) throw new Error(`Artwork upload failed (${put.status})`);
 
   return publicUrl;
+};
+
+// --- Analytics ---
+
+/**
+ * Visitor analytics for a date range.
+ *
+ * Served by this local admin server rather than the public API, because the
+ * answer contains where people watched from and the addresses of those who
+ * signed in.
+ */
+export const getAnalytics = (from?: string, to?: string) => {
+  const query = new URLSearchParams();
+  if (from) query.set("from", from);
+  if (to) query.set("to", to);
+  const suffix = query.toString();
+  return request<Analytics>(`/analytics${suffix ? `?${suffix}` : ""}`);
 };
